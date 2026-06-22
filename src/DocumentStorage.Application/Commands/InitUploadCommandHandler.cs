@@ -27,7 +27,7 @@ public class InitUploadCommandHandler
 
         var instruction = await _storageProvider.InitUploadAsync(
             storageKey, command.ContentType, command.Size,
-            _options.UploadExpirationMinutes, ct);
+            _options.UploadExpirationMinutes, ct).ConfigureAwait(false);
 
         return new InitUploadResponse(
             fileId,

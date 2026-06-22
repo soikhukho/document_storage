@@ -26,17 +26,17 @@ public class DeleteFileCommandHandler
     {
         var document = command.UserId.HasValue
             ? await _repository.GetByIdAndUserAsync(
-                command.FileId, command.ProjectId, command.UserId.Value, ct)
+                command.FileId, command.ProjectId, command.UserId.Value, ct).ConfigureAwait(false)
             : await _repository.GetByIdAsync(
-                command.FileId, command.ProjectId, ct);
+                command.FileId, command.ProjectId, ct).ConfigureAwait(false);
 
         if (document is null)
             throw new FileNotFoundException(command.FileId);
 
         document.SoftDelete();
-        await _repository.UpdateAsync(document, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        await _repository.UpdateAsync(document, ct).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        await _storageProvider.DeleteAsync(document.StorageKey, ct);
+        await _storageProvider.DeleteAsync(document.StorageKey, ct).ConfigureAwait(false);
     }
 }

@@ -19,7 +19,7 @@ public class GetAllProjectsQueryHandler
         GetAllProjectsQuery query, CancellationToken ct = default)
     {
         var (items, totalCount) = await _repository.GetAllAsync(
-            query.Page, query.PageSize, ct);
+            query.Page, query.PageSize, ct).ConfigureAwait(false);
 
         var dtos = items
             .Select(CreateProjectCommandHandler.MapToDto)

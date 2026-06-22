@@ -19,7 +19,7 @@ public class GetProjectByIdQueryHandler
     public async Task<ProjectDto> HandleAsync(
         GetProjectByIdQuery query, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(query.ProjectId, ct)
+        var project = await _repository.GetByIdAsync(query.ProjectId, ct).ConfigureAwait(false)
             ?? throw new ProjectNotFoundException(query.ProjectId);
 
         return CreateProjectCommandHandler.MapToDto(project);

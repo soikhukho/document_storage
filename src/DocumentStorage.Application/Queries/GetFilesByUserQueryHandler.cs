@@ -18,7 +18,7 @@ public class GetFilesByUserQueryHandler
         GetFilesByUserQuery query, CancellationToken ct = default)
     {
         var (items, totalCount) = await _repository.SearchAsync(
-            query.ProjectId, null, query.UserId, query.Page, query.PageSize, null, null, ct);
+            query.ProjectId, null, query.UserId, query.Page, query.PageSize, null, null, ct).ConfigureAwait(false);
 
         var dtos = items
             .Select(d => FileMapper.ToDto(d, string.Empty))

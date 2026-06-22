@@ -25,7 +25,7 @@ public class SearchFilesQueryHandler
             query.PageSize,
             query.SortBy,
             query.SortDirection,
-            ct);
+            ct).ConfigureAwait(false);
 
         // DownloadUrl is intentionally empty for list results.
         // Clients should call GET /api/files/{id} for a fresh presigned download URL.

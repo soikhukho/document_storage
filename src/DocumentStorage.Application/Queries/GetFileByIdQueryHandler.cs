@@ -27,14 +27,14 @@ public class GetFileByIdQueryHandler
     public async Task<FileDto> HandleAsync(GetFileByIdQuery query, CancellationToken ct = default)
     {
         var document = query.UserId.HasValue
-            ? await _repository.GetByIdAndUserAsync(query.FileId, query.ProjectId, query.UserId.Value, ct)
-            : await _repository.GetByIdAsync(query.FileId, query.ProjectId, ct);
+            ? await _repository.GetByIdAndUserAsync(query.FileId, query.ProjectId, query.UserId.Value, ct).ConfigureAwait(false)
+            : await _repository.GetByIdAsync(query.FileId, query.ProjectId, ct).ConfigureAwait(false);
 
         if (document is null)
             throw new FileNotFoundException(query.FileId);
 
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
-            document.StorageKey, _options.DownloadExpirationMinutes, ct);
+            document.StorageKey, _options.DownloadExpirationMinutes, ct).ConfigureAwait(false);
 
         return FileMapper.ToDto(document, downloadUrl);
     }

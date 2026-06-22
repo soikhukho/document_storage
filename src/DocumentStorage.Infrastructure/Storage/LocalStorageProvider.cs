@@ -120,7 +120,7 @@ public class LocalStorageProvider : IStorageProvider
 
         await using var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None,
             bufferSize: 81920, useAsync: true);
-        await content.CopyToAsync(fs, ct);
+        await content.CopyToAsync(fs, ct).ConfigureAwait(false);
     }
 
     /// <summary>

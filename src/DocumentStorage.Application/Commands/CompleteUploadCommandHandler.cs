@@ -36,7 +36,7 @@ public class CompleteUploadCommandHandler
 
         var storageKey = StorageKeyGenerator.Generate(command.ProjectId, command.UserId, command.FileId, extension);
 
-        if (!await _storageProvider.ExistsAsync(storageKey, ct))
+        if (!await _storageProvider.ExistsAsync(storageKey, ct).ConfigureAwait(false))
             throw new FileNotFoundException(command.FileId);
 
         var document = FileDocument.Create(
@@ -50,11 +50,11 @@ public class CompleteUploadCommandHandler
             command.UserId,
             command.Description);
 
-        await _repository.AddAsync(document, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        await _repository.AddAsync(document, ct).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
-            storageKey, _options.DownloadExpirationMinutes, ct);
+            storageKey, _options.DownloadExpirationMinutes, ct).ConfigureAwait(false);
 
         return FileMapper.ToDto(document, downloadUrl);
     }

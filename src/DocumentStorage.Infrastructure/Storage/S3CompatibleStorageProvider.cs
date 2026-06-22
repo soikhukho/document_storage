@@ -58,7 +58,7 @@ public abstract class S3CompatibleStorageProvider : IStorageProvider
 
     public async Task CompleteUploadAsync(string storageKey, CancellationToken ct = default)
     {
-        if (!await ExistsAsync(storageKey, ct))
+        if (!await ExistsAsync(storageKey, ct).ConfigureAwait(false))
             throw new StorageException($"Object '{storageKey}' not found after upload.");
     }
 
@@ -88,7 +88,7 @@ public abstract class S3CompatibleStorageProvider : IStorageProvider
     {
         try
         {
-            await _client.DeleteObjectAsync(_bucket, storageKey, ct);
+            await _client.DeleteObjectAsync(_bucket, storageKey, ct).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -101,7 +101,7 @@ public abstract class S3CompatibleStorageProvider : IStorageProvider
     {
         try
         {
-            await _client.GetObjectMetadataAsync(_bucket, storageKey, ct);
+            await _client.GetObjectMetadataAsync(_bucket, storageKey, ct).ConfigureAwait(false);
             return true;
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -120,7 +120,7 @@ public abstract class S3CompatibleStorageProvider : IStorageProvider
     {
         try
         {
-            var resp = await _client.GetObjectMetadataAsync(_bucket, storageKey, ct);
+            var resp = await _client.GetObjectMetadataAsync(_bucket, storageKey, ct).ConfigureAwait(false);
             var contentType = resp.Headers["Content-Type"] ?? "application/octet-stream";
             return new StorageObjectMetadata(
                 resp.ContentLength,

@@ -22,12 +22,12 @@ public class UpdateProjectCommandHandler
     public async Task<ProjectDto> HandleAsync(
         UpdateProjectCommand command, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(command.ProjectId, ct)
+        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false)
             ?? throw new ProjectNotFoundException(command.ProjectId);
 
         project.Update(command.Name, command.Description);
-        await _repository.UpdateAsync(project, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        await _repository.UpdateAsync(project, ct).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return CreateProjectCommandHandler.MapToDto(project);
     }

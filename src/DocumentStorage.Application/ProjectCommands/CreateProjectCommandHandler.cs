@@ -24,8 +24,8 @@ public class CreateProjectCommandHandler
     {
         var project = Project.Create(command.Name, command.Description);
 
-        await _repository.AddAsync(project, ct);
-        await _unitOfWork.SaveChangesAsync(ct);
+        await _repository.AddAsync(project, ct).ConfigureAwait(false);
+        await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return MapToDto(project);
     }

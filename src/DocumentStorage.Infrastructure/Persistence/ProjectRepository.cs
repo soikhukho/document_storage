@@ -24,7 +24,7 @@ public class ProjectRepository : IProjectRepository
     {
         IQueryable<Project> query = _db.Projects.AsNoTracking();
 
-        var totalCount = await query.CountAsync(ct);
+        var totalCount = await query.CountAsync(ct).ConfigureAwait(false);
 
         page = Math.Max(page, 1);
         pageSize = Math.Clamp(pageSize, 1, 100);
@@ -33,13 +33,13 @@ public class ProjectRepository : IProjectRepository
             .OrderByDescending(x => x.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync(ct);
+            .ToListAsync(ct).ConfigureAwait(false);
 
         return (items, totalCount);
     }
 
     public async Task AddAsync(Project project, CancellationToken ct = default)
-        => await _db.Projects.AddAsync(project, ct);
+        => await _db.Projects.AddAsync(project, ct).ConfigureAwait(false);
 
     public Task UpdateAsync(Project project, CancellationToken ct = default)
     {

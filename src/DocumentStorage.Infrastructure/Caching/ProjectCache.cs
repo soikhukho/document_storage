@@ -22,7 +22,7 @@ public class ProjectCache : IProjectCache
         return await _cache.GetOrCreateAsync($"project:{apiKey}", async entry =>
         {
             entry.SetSize(1);
-            var projectId = await factory(ct);
+            var projectId = await factory(ct).ConfigureAwait(false);
 
             if (projectId == Guid.Empty)
                 entry.SetAbsoluteExpiration(NegativeCacheDuration);
@@ -30,7 +30,7 @@ public class ProjectCache : IProjectCache
                 entry.SetSlidingExpiration(PositiveCacheDuration);
 
             return projectId;
-        });
+        }).ConfigureAwait(false);
     }
 
     public void Invalidate(string apiKey)
