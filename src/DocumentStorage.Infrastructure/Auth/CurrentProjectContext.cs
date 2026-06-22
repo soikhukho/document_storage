@@ -1,3 +1,4 @@
+using DocumentStorage.Application;
 using DocumentStorage.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 
@@ -20,7 +21,7 @@ public class CurrentProjectContext : ICurrentProjectContext
     {
         get
         {
-            if (_accessor.HttpContext?.Items.TryGetValue("ProjectId", out var val) == true
+            if (_accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.ProjectId, out var val) == true
                 && val is Guid id)
                 return id;
 

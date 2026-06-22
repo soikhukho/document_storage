@@ -1,3 +1,4 @@
+using DocumentStorage.Application;
 using DocumentStorage.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
@@ -35,7 +36,7 @@ public sealed class ProjectResolutionMiddleware
             if (!string.IsNullOrEmpty(_adminKey)
                 && string.Equals(key, _adminKey, StringComparison.Ordinal))
             {
-                context.Items["IsAdmin"] = true;
+                context.Items[HttpContextItemsKeys.IsAdmin] = true;
             }
             else
             {
@@ -46,7 +47,7 @@ public sealed class ProjectResolutionMiddleware
                 }, context.RequestAborted);
 
                 if (projectId != Guid.Empty)
-                    context.Items["ProjectId"] = projectId;
+                    context.Items[HttpContextItemsKeys.ProjectId] = projectId;
             }
         }
 

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using DocumentStorage.Application;
 using DocumentStorage.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 
@@ -36,6 +37,6 @@ public class CurrentUserContext : ICurrentUserContext
     public bool IsAuthenticated => UserId != Guid.Empty;
 
     public bool IsAdmin =>
-        _accessor.HttpContext?.Items.TryGetValue("IsAdmin", out var val) == true
+        _accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.IsAdmin, out var val) == true
         && val is true;
 }

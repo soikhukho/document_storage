@@ -124,6 +124,10 @@ public class ProjectsController : ControllerBase
 
         var query = new GetProjectByIdQuery(id);
         var result = await handler.HandleAsync(query, ct);
+
+        if (!IsAdmin)
+            return Ok(result with { ApiKey = "" });
+
         return Ok(result);
     }
 

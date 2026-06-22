@@ -1,3 +1,4 @@
+using DocumentStorage.Application;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -13,7 +14,7 @@ public sealed class AdminOnlyAttribute : Attribute, IAuthorizationFilter
 {
     public void OnAuthorization(AuthorizationFilterContext context)
     {
-        var isAdmin = context.HttpContext.Items.TryGetValue("IsAdmin", out var val) && val is true;
+        var isAdmin = context.HttpContext.Items.TryGetValue(HttpContextItemsKeys.IsAdmin, out var val) && val is true;
 
         if (!isAdmin)
         {
