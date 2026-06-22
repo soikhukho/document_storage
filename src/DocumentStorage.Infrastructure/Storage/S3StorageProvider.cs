@@ -15,11 +15,12 @@ public class S3StorageProvider : S3CompatibleStorageProvider
             options.BucketName,
             logger)
     {
-        ValidateOptions(options);
     }
 
     private static IAmazonS3 CreateClient(S3StorageOptions options)
     {
+        ValidateOptions(options);
+
         var config = new AmazonS3Config
         {
             RegionEndpoint = RegionEndpoint.GetBySystemName(options.Region)

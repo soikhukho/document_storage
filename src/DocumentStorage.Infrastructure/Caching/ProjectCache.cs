@@ -6,7 +6,8 @@ namespace DocumentStorage.Infrastructure.Caching;
 public class ProjectCache : IProjectCache
 {
     private readonly IMemoryCache _cache;
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan PositiveCacheDuration = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan NegativeCacheDuration = TimeSpan.FromSeconds(30);
 
     public ProjectCache(IMemoryCache cache)
     {
@@ -20,8 +21,15 @@ public class ProjectCache : IProjectCache
     {
         return await _cache.GetOrCreateAsync($"project:{apiKey}", async entry =>
         {
-            entry.SetSlidingExpiration(CacheDuration);
-            return await factory(ct);
+            entry.SetSize(1);
+            var projectId = await factory(ct);
+
+            if (projectId == Guid.Empty)
+                entry.SetAbsoluteExpiration(NegativeCacheDuration);
+            else
+                entry.SetSlidingExpiration(PositiveCacheDuration);
+
+            return projectId;
         });
     }
 

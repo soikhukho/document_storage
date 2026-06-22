@@ -14,11 +14,12 @@ public class MinioStorageProvider : S3CompatibleStorageProvider
             options.BucketName,
             logger)
     {
-        ValidateOptions(options);
     }
 
     private static IAmazonS3 CreateClient(MinioStorageOptions options)
     {
+        ValidateOptions(options);
+
         var config = new AmazonS3Config
         {
             ServiceURL = options.Endpoint,

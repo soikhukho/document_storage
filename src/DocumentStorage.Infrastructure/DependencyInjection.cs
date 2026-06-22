@@ -41,7 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         // ── Caching ──
-        services.AddMemoryCache();
+        services.AddMemoryCache(options => options.SizeLimit = 10_000);
         services.AddSingleton<IProjectCache, ProjectCache>();
 
         // ── Current user context ──
