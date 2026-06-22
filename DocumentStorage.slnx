@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DocumentStorage.Api/DocumentStorage.Api.csproj" />
+    <Project Path="src/DocumentStorage.Application/DocumentStorage.Application.csproj" />
+    <Project Path="src/DocumentStorage.Domain/DocumentStorage.Domain.csproj" />
+    <Project Path="src/DocumentStorage.Infrastructure/DocumentStorage.Infrastructure.csproj" />
+    <Project Path="src/DocumentStorage.Shared/DocumentStorage.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DocumentStorage.Application.Tests/DocumentStorage.Application.Tests.csproj" />
+    <Project Path="tests/DocumentStorage.Domain.Tests/DocumentStorage.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

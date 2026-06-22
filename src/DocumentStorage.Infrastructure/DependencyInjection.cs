@@ -1,0 +1,79 @@
+using Amazon.S3;
+using DocumentStorage.Application.DTOs;
+using DocumentStorage.Application.Interfaces;
+using DocumentStorage.Domain.Enums;
+using DocumentStorage.Infrastructure.Auth;
+using DocumentStorage.Infrastructure.Caching;
+using DocumentStorage.Infrastructure.Persistence;
+using DocumentStorage.Infrastructure.Storage;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace DocumentStorage.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        // ── Storage options (SDD §18) ──
+        var storageOptions = configuration
+            .GetSection(StorageOptions.SectionName)
+            .Get<StorageOptions>() ?? new StorageOptions();
+        services.AddSingleton(storageOptions);
+
+        // ── EF Core (PostgreSQL or SQL Server) ──
+        var dbProvider = configuration.GetValue<string>("Database:Provider") ?? "PostgreSQL";
+        var connectionString = configuration.GetConnectionString(dbProvider)
+            ?? configuration.GetConnectionString("DefaultConnection");
+
+        services.AddDbContext<DocumentStorageDbContext>(options =>
+        {
+            if (IsSqlServer(dbProvider))
+                options.UseSqlServer(connectionString);
+            else
+                options.UseNpgsql(connectionString);
+        });
+
+        services.AddScoped<IFileDocumentRepository, FileDocumentRepository>();
+        services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // ── Caching ──
+        services.AddMemoryCache();
+        services.AddSingleton<IProjectCache, ProjectCache>();
+
+        // ── Current user context ──
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserContext, CurrentUserContext>();
+        services.AddScoped<ICurrentProjectContext, CurrentProjectContext>();
+
+        // ── Storage provider (resolved at startup from config) ──
+        switch (storageOptions.Provider)
+        {
+            case StorageProviderType.S3:
+                services.AddSingleton(configuration.GetSection("S3").Get<S3StorageOptions>()
+                    ?? new S3StorageOptions());
+                services.AddSingleton<IStorageProvider, S3StorageProvider>();
+                break;
+
+            case StorageProviderType.MinIO:
+                services.AddSingleton(configuration.GetSection("MinIO").Get<MinioStorageOptions>()
+                    ?? new MinioStorageOptions());
+                services.AddSingleton<IStorageProvider, MinioStorageProvider>();
+                break;
+
+            default:
+                services.AddSingleton(configuration.GetSection("Local").Get<LocalStorageOptions>()
+                    ?? new LocalStorageOptions());
+                services.AddSingleton<IStorageProvider, LocalStorageProvider>();
+                break;
+        }
+
+        return services;
+    }
+
+    private static bool IsSqlServer(string provider)
+        => provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase);
+}

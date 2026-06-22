@@ -1,0 +1,26 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+
+# Logs
+*.log
+
+# Environment
+.env
+appsettings.Development.json
+
+# Claude Code
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
