@@ -26,7 +26,25 @@
 
 ## 2. Cấu hình
 
-Tất cả cấu hình nằm trong `appsettings.json`:
+Cấu hình nằm trong `appsettings.json`. **Không lưu credentials (connection string, admin key) trong `appsettings.json`** — dùng một trong các cách sau:
+
+| Môi trường | Cách cấu hình |
+|---|---|
+| **Development** | User Secrets (`dotnet user-secrets`) |
+| **Production** | Environment variables hoặc Docker env |
+
+```bash
+# Development — User Secrets
+cd src/DocumentStorage.Api
+dotnet user-secrets set "ConnectionStrings:SqlServer" "Server=...;Password=..."
+dotnet user-secrets set "Auth:AdminKey" "your-secure-admin-key"
+
+# Production — Environment variables
+export ConnectionStrings__SqlServer="Server=...;Password=..."
+export Auth__AdminKey="your-secure-admin-key"
+```
+
+> **Lưu ý:** .NET dùng `__` (double underscore) cho hierarchy trong env vars, tương đương `:` trong JSON.
 
 ### 2.1. Database
 
@@ -36,8 +54,8 @@ Tất cả cấu hình nằm trong `appsettings.json`:
     "Provider": "SqlServer"          // hoặc "PostgreSQL"
   },
   "ConnectionStrings": {
-    "SqlServer": "Server=HOST,1433;Database=Document_Storage;User Id=USER;Password=PASS;TrustServerCertificate=True",
-    "PostgreSQL": "Host=HOST;Database=document_storage;Username=USER;Password=PASS"
+    "SqlServer": "",                 // ← set via user secrets / env var
+    "PostgreSQL": "Host=localhost;Database=document_storage;Username=postgres;Password=postgres"
   }
 }
 ```
@@ -49,12 +67,12 @@ Tất cả cấu hình nằm trong `appsettings.json`:
 ```json
 {
   "Auth": {
-    "AdminKey": "admin-secret-key-change-in-production"
+    "AdminKey": ""                   // ← set via user secrets / env var
   }
 }
 ```
 
-**Bắt buộc đổi** `AdminKey` khi triển khai production. Đây là key quản trị dùng để:
+**Bắt buộc cấu hình** `AdminKey` trước khi chạy. Đây là key quản trị dùng để:
 - Tạo/sửa/xóa project
 - Xem file tất cả projects
 - Deactivate/regenerate API key
@@ -159,21 +177,26 @@ dotnet DocumentStorage.Api.dll
 
 Mặc định chạy ở `http://localhost:5000`.
 
-### 3.4. Triển khai với IIS / Kestrel / Docker
+### 3.4. Triển khai với Docker
 
-**Docker:**
-```dockerfile
-FROM mcr.microsoft.com/dotnet/aspnet:9.0
-WORKDIR /app
-COPY publish/ .
-EXPOSE 80
-ENTRYPOINT ["dotnet", "DocumentStorage.Api.dll"]
-```
+Dự án có sẵn `Dockerfile` (multi-stage build) và `docker-compose.yml`:
 
 ```bash
+# Chạy API + SQL Server
+docker-compose up
+
+# Build thủ công
 docker build -t document-storage .
-docker run -p 8080:80 -v $(pwd)/appsettings.json:/app/appsettings.json document-storage
+docker run -p 8080:8080 \
+  -e ConnectionStrings__SqlServer="Server=...;Password=..." \
+  -e Auth__AdminKey="your-admin-key" \
+  document-storage
 ```
+
+`docker-compose.yml` bao gồm:
+- **api** — ASP.NET Core API (port 8080)
+- **db** — SQL Server 2022 với healthcheck
+- Volumes cho `uploads/` và database
 
 ---
 
@@ -283,10 +306,13 @@ Content-Type: application/json
 **Local:** PUT file binary lên API:
 ```http
 PUT /api/files/local-upload/projects/{projectId}/users/{userId}/2026/06/{fileId}.pdf
+X-API-Key: pk_3f8a2b1c...
 Content-Type: application/pdf
 
 <binary data>
 ```
+
+> **Lưu ý:** Endpoint local-upload và local-download yêu cầu header `X-API-Key`.
 
 #### Phase 3 — Complete Upload
 
@@ -325,6 +351,12 @@ Content-Type: application/json
 ```http
 GET /api/files/{fileId}
 X-API-Key: pk_3f8a2b1c...
+```
+
+**Admin (chỉ định project):**
+```http
+GET /api/files/{fileId}?projectId={projectId}
+X-API-Key: admin-key
 ```
 
 **Response:** Trả về metadata + `downloadUrl` mới (presigned URL có thời hạn theo `DownloadExpirationMinutes`).
@@ -377,6 +409,8 @@ Content-Type: application/json
 }
 ```
 
+**Admin:** Thêm `?projectId={projectId}` vào URL.
+
 ### 5.5. Xóa file (soft delete)
 
 ```http
@@ -384,7 +418,9 @@ DELETE /api/files/{fileId}
 X-API-Key: pk_3f8a2b1c...
 ```
 
-→ File bị xóa khỏi storage + đánh dấu `IsDeleted` trong DB.
+**Admin:** Thêm `?projectId={projectId}` vào URL.
+
+→ File bị soft-delete trong DB trước, sau đó xóa khỏi storage.
 
 ### 5.6. Quản lý Project (Admin only)
 
@@ -488,7 +524,8 @@ const fileDto = await completeRes.json();
 
 ### 7.3. Khuyến nghị production
 
-- Đổi `AdminKey` mặc định
+- **Không lưu secrets trong `appsettings.json`** — dùng environment variables hoặc user secrets
+- Đổi `AdminKey` thành giá trị mạnh, ngẫu nhiên
 - Dùng HTTPS
 - Giới hạn `AllowedExtensions` theo nhu cầu
 - Cấu hình `MaxUploadSizeBytes` phù hợp
