@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+using DocumentStorage.Api.Attributes;
 using DocumentStorage.Api.Models;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
@@ -31,14 +33,12 @@ public class ProjectsController : ControllerBase
     /// Create a new project. Returns project info with API key. [Admin]
     /// </summary>
     [HttpPost]
+    [AdminOnly]
     public async Task<IActionResult> Create(
         [FromBody] CreateProjectRequest request,
         [FromServices] ICommandHandler<CreateProjectCommand, ProjectDto> handler,
         CancellationToken ct)
     {
-        if (!IsAdmin)
-            return StatusCode(403, new { title = "Forbidden", detail = "Admin access required." });
-
         var command = new CreateProjectCommand(request.Name, request.Description);
         var result = await handler.HandleAsync(command, ct);
         return Ok(result);
@@ -48,15 +48,13 @@ public class ProjectsController : ControllerBase
     /// List all projects (paged). [Admin]
     /// </summary>
     [HttpGet]
+    [AdminOnly]
     public async Task<IActionResult> GetAll(
         [FromServices] IQueryHandler<GetAllProjectsQuery, PagedResult<ProjectDto>> handler,
         CancellationToken ct,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20)
     {
-        if (!IsAdmin)
-            return StatusCode(403, new { title = "Forbidden", detail = "Admin access required." });
-
         var query = new GetAllProjectsQuery(page, pageSize);
         var result = await handler.HandleAsync(query, ct);
         return Ok(result);
@@ -66,15 +64,13 @@ public class ProjectsController : ControllerBase
     /// Update project name and/or description. [Admin]
     /// </summary>
     [HttpPut("{id:guid}")]
+    [AdminOnly]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateProjectRequest request,
         [FromServices] ICommandHandler<UpdateProjectCommand, ProjectDto> handler,
         CancellationToken ct)
     {
-        if (!IsAdmin)
-            return StatusCode(403, new { title = "Forbidden", detail = "Admin access required." });
-
         var command = new UpdateProjectCommand(id, request.Name, request.Description);
         var result = await handler.HandleAsync(command, ct);
         return Ok(result);
@@ -84,15 +80,13 @@ public class ProjectsController : ControllerBase
     /// Activate or deactivate a project. [Admin]
     /// </summary>
     [HttpPatch("{id:guid}/active")]
+    [AdminOnly]
     public async Task<IActionResult> SetActive(
         Guid id,
         [FromBody] bool isActive,
         [FromServices] ICommandHandler<SetProjectActiveCommand> handler,
         CancellationToken ct)
     {
-        if (!IsAdmin)
-            return StatusCode(403, new { title = "Forbidden", detail = "Admin access required." });
-
         var command = new SetProjectActiveCommand(id, isActive);
         await handler.HandleAsync(command, ct);
         return NoContent();
@@ -102,14 +96,12 @@ public class ProjectsController : ControllerBase
     /// Regenerate the API key for a project. [Admin]
     /// </summary>
     [HttpPost("{id:guid}/regenerate-key")]
+    [AdminOnly]
     public async Task<IActionResult> RegenerateApiKey(
         Guid id,
         [FromServices] ICommandHandler<RegenerateApiKeyCommand, ProjectDto> handler,
         CancellationToken ct)
     {
-        if (!IsAdmin)
-            return StatusCode(403, new { title = "Forbidden", detail = "Admin access required." });
-
         var command = new RegenerateApiKeyCommand(id);
         var result = await handler.HandleAsync(command, ct);
         return Ok(result);
@@ -145,8 +137,8 @@ public class ProjectsController : ControllerBase
         [FromServices] IQueryHandler<SearchFilesQuery, PagedResult<FileDto>> handler,
         CancellationToken ct,
         [FromQuery] string? keyword = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc")
     {

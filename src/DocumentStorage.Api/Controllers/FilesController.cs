@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using DocumentStorage.Api.Models;
 using DocumentStorage.Application.Commands;
 using DocumentStorage.Application.DTOs;
@@ -155,8 +156,8 @@ public class FilesController : ControllerBase
         [FromServices] IQueryHandler<SearchFilesQuery, PagedResult<FileDto>> handler,
         CancellationToken ct,
         [FromQuery] string? keyword = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20,
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc")
     {
@@ -176,8 +177,8 @@ public class FilesController : ControllerBase
         Guid userId,
         [FromServices] IQueryHandler<GetFilesByUserQuery, PagedResult<FileDto>> handler,
         CancellationToken ct,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20)
     {
         var query = new GetFilesByUserQuery(GetScopedProjectId(), userId, page, pageSize);
         var result = await handler.HandleAsync(query, ct);

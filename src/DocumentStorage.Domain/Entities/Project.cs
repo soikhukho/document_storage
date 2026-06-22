@@ -36,8 +36,12 @@ public class Project
 
     public void Update(string? name = null, string? description = null)
     {
-        if (!string.IsNullOrWhiteSpace(name))
+        if (name is not null)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                throw new ArgumentException("Project name cannot be empty or whitespace.", nameof(name));
             Name = name.Trim();
+        }
         if (description is not null)
             Description = description.Trim();
         UpdatedAt = DateTime.UtcNow;
