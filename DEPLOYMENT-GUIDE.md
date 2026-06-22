@@ -91,7 +91,7 @@ export Auth__AdminKey="your-secure-admin-key"
     "AllowedExtensions": ["pdf", "docx", "xlsx", "png", "jpg", "jpeg"]
   },
   "Local": {
-    "BaseDirectory": "uploads",            // thư mục lưu file
+    "BaseDirectory": "C:/DocumentStorage/uploads",  // đường dẫn tuyệt đối, thư mục lưu file
     "PublicBaseUrl": "https://your-domain.com"  // URL công khai để client upload/download
   }
 }

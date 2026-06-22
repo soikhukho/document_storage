@@ -21,6 +21,9 @@ appsettings.Development.json
 # Claude Code
 .claude/
 
+# Uploads (local storage)
+uploads/
+
 # OS
 Thumbs.db
 .DS_Store
