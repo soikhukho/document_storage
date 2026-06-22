@@ -43,6 +43,7 @@ public class ProjectRepository : IProjectRepository
 
     public Task UpdateAsync(Project project, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         _db.Projects.Update(project);
         return Task.CompletedTask;
     }

@@ -66,6 +66,7 @@ public class FileDocumentRepository : IFileDocumentRepository
 
     public Task UpdateAsync(FileDocument document, CancellationToken ct = default)
     {
+        ct.ThrowIfCancellationRequested();
         _db.FileDocuments.Update(document);
         return Task.CompletedTask;
     }
