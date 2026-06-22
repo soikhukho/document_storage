@@ -33,17 +33,17 @@ public sealed class ExceptionHandlingMiddleware
 
     private async Task HandleAsync(HttpContext context, Exception ex)
     {
-        var (status, title) = ex switch
+        var (status, title, exposeMessage) = ex switch
         {
-            FileNotFoundException     => (404, "File Not Found"),
-            ProjectNotFoundException  => (404, "Project Not Found"),
-            InvalidFileTypeException  => (400, "Invalid File Type"),
-            UploadExpiredException    => (410, "Upload Expired"),
-            PermissionDeniedException => (403, "Permission Denied"),
-            StorageException          => (502, "Storage Error"),
-            ArgumentException         => (400, "Validation Error"),
-            UnauthorizedAccessException => (401, "Unauthorized"),
-            _                         => (500, "Internal Server Error")
+            FileNotFoundException       => (404, "File Not Found", true),
+            ProjectNotFoundException    => (404, "Project Not Found", true),
+            InvalidFileTypeException    => (400, "Invalid File Type", true),
+            UploadExpiredException      => (410, "Upload Expired", true),
+            PermissionDeniedException   => (403, "Permission Denied", true),
+            StorageException            => (502, "Storage Error", true),
+            UnauthorizedAccessException  => (401, "Unauthorized", true),
+            ArgumentException           => (400, "Validation Error", false),
+            _                           => (500, "Internal Server Error", false)
         };
 
         if (status >= 500)
@@ -59,7 +59,7 @@ public sealed class ExceptionHandlingMiddleware
             type = $"https://httpstatuses.io/{status}",
             title,
             status,
-            detail = ex.Message,
+            detail = exposeMessage ? ex.Message : title,
             instance = context.Request.Path.Value,
             traceId = Activity.Current?.Id ?? context.TraceIdentifier
         };

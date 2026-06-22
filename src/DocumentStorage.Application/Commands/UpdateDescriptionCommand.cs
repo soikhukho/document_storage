@@ -3,6 +3,6 @@ namespace DocumentStorage.Application.Commands;
 public record UpdateDescriptionCommand(
     Guid ProjectId,
     Guid FileId,
-    Guid UserId,
+    Guid? UserId,
     string Description
 );

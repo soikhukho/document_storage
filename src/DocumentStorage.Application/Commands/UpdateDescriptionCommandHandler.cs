@@ -30,9 +30,14 @@ public class UpdateDescriptionCommandHandler
     public async Task<FileDto> HandleAsync(
         UpdateDescriptionCommand command, CancellationToken ct = default)
     {
-        var document = await _repository.GetByIdAndUserAsync(
-            command.FileId, command.ProjectId, command.UserId, ct)
-            ?? throw new FileNotFoundException(command.FileId);
+        var document = command.UserId.HasValue
+            ? await _repository.GetByIdAndUserAsync(
+                command.FileId, command.ProjectId, command.UserId.Value, ct)
+            : await _repository.GetByIdAsync(
+                command.FileId, command.ProjectId, ct);
+
+        if (document is null)
+            throw new FileNotFoundException(command.FileId);
 
         document.UpdateDescription(command.Description);
         await _repository.UpdateAsync(document, ct);

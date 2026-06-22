@@ -47,6 +47,24 @@ public class FilesController : ControllerBase
         return _currentProject.ProjectId;
     }
 
+    // Resolves a required projectId for single-file endpoints.
+    // Admin must pass ?projectId=...; non-admin is scoped to their API-key project.
+    private Guid ResolveProjectId(Guid? projectIdParam)
+    {
+        if (_currentUser.IsAdmin)
+        {
+            if (projectIdParam is { } id && id != Guid.Empty)
+                return id;
+
+            throw new UnauthorizedAccessException("Admin must specify a project via the 'projectId' query parameter.");
+        }
+
+        if (!_currentProject.IsAvailable)
+            throw new UnauthorizedAccessException("Valid X-API-Key header is required.");
+
+        return _currentProject.ProjectId;
+    }
+
     // ──────────────────────────────────────────────────────────────
     //  SDD §15 API Contract
     // ──────────────────────────────────────────────────────────────
@@ -92,34 +110,38 @@ public class FilesController : ControllerBase
 
     /// <summary>
     /// Get a single file by id (generates a fresh presigned download URL).
+    /// Admin: any project via ?projectId=. User: only their own project.
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<FileDto>> GetById(
         Guid id,
         [FromServices] IQueryHandler<GetFileByIdQuery, FileDto> handler,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] Guid? projectId = null)
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin must specify a project.");
+        var pid = ResolveProjectId(projectId);
+        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
 
-        var query = new GetFileByIdQuery(projectId, id, GetUserId());
+        var query = new GetFileByIdQuery(pid, id, userId);
         var result = await handler.HandleAsync(query, ct);
         return Ok(result);
     }
 
     /// <summary>
     /// Soft-delete a file and remove it from storage.
+    /// Admin: any project via ?projectId=. User: only their own project.
     /// </summary>
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(
         Guid id,
         [FromServices] ICommandHandler<DeleteFileCommand> handler,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] Guid? projectId = null)
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin must specify a project.");
+        var pid = ResolveProjectId(projectId);
+        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
 
-        var command = new DeleteFileCommand(projectId, id, GetUserId());
+        var command = new DeleteFileCommand(pid, id, userId);
         await handler.HandleAsync(command, ct);
         return NoContent();
     }
@@ -164,18 +186,20 @@ public class FilesController : ControllerBase
 
     /// <summary>
     /// Update the description on an existing file.
+    /// Admin: any project via ?projectId=. User: only their own project.
     /// </summary>
     [HttpPatch("{id:guid}/description")]
     public async Task<ActionResult<FileDto>> UpdateDescription(
         Guid id,
         [FromBody] UpdateDescriptionRequest request,
         [FromServices] ICommandHandler<UpdateDescriptionCommand, FileDto> handler,
-        CancellationToken ct)
+        CancellationToken ct,
+        [FromQuery] Guid? projectId = null)
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin must specify a project.");
+        var pid = ResolveProjectId(projectId);
+        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
 
-        var command = new UpdateDescriptionCommand(projectId, id, GetUserId(), request.Description);
+        var command = new UpdateDescriptionCommand(pid, id, userId, request.Description);
         var result = await handler.HandleAsync(command, ct);
         return Ok(result);
     }

@@ -26,8 +26,12 @@ public class GetFileByIdQueryHandler
 
     public async Task<FileDto> HandleAsync(GetFileByIdQuery query, CancellationToken ct = default)
     {
-        var document = await _repository.GetByIdAndUserAsync(query.FileId, query.ProjectId, query.UserId, ct)
-            ?? throw new FileNotFoundException(query.FileId);
+        var document = query.UserId.HasValue
+            ? await _repository.GetByIdAndUserAsync(query.FileId, query.ProjectId, query.UserId.Value, ct)
+            : await _repository.GetByIdAsync(query.FileId, query.ProjectId, ct);
+
+        if (document is null)
+            throw new FileNotFoundException(query.FileId);
 
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
             document.StorageKey, _options.DownloadExpirationMinutes, ct);
