@@ -7,6 +7,7 @@ public class DocumentStorageDbContext : DbContext
 {
     public DbSet<FileDocument> FileDocuments => Set<FileDocument>();
     public DbSet<Project> Projects => Set<Project>();
+    public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
 
     public DocumentStorageDbContext(DbContextOptions<DocumentStorageDbContext> options)
         : base(options)

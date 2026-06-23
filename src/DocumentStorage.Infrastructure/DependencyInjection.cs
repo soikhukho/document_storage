@@ -38,7 +38,13 @@ public static class DependencyInjection
 
         services.AddScoped<IFileDocumentRepository, FileDocumentRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
+        services.AddScoped<IAdminUserRepository, AdminUserRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // ── Auth (admin JWT login) ──
+        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
         // ── Caching ──
         services.AddMemoryCache(options => options.SizeLimit = 10_000);

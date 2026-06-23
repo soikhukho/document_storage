@@ -39,4 +39,24 @@ public class CurrentUserContext : ICurrentUserContext
     public bool IsAdmin =>
         _accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.IsAdmin, out var val) == true
         && val is true;
+
+    /// <summary>
+    /// Resolved admin user id (set by JWT middleware) or Guid.Empty when
+    /// the caller is a project-scoped API key or anonymous.
+    /// </summary>
+    public Guid AdminUserId
+    {
+        get
+        {
+            if (_accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.AdminUserId, out var val) == true
+                && val is Guid id)
+                return id;
+            return Guid.Empty;
+        }
+    }
+
+    public string? AdminUsername
+        => _accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.AdminUsername, out var val) == true
+            ? val as string
+            : null;
 }

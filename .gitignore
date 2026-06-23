@@ -18,6 +18,10 @@ artifacts/
 .env
 appsettings.Development.json
 
+# Dev HTTPS certificate (dotnet dev-certs https)
+*.pfx
+aspnetapp.*.pfx
+
 # Claude Code
 .claude/
 
