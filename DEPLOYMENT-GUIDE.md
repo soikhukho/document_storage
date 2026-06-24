@@ -218,12 +218,18 @@ Content-Type: application/json
 **Response:**
 ```json
 {
-  "id": "a1b2c3d4-...",
-  "name": "App Mobile",
-  "description": "Files cho ứng dụng mobile",
-  "apiKey": "pk_3f8a2b1c4d5e6f7g8h9i0j...",
-  "isActive": true,
-  "createdAt": "2026-06-19T08:00:00Z"
+  "success": true,
+  "data": {
+    "id": "a1b2c3d4-...",
+    "name": "App Mobile",
+    "description": "Files cho ứng dụng mobile",
+    "apiKey": "pk_3f8a2b1c4d5e6f7g8h9i0j...",
+    "isActive": true,
+    "createdAt": "2026-06-19T08:00:00Z"
+  },
+  "message": "Request processed successfully.",
+  "errors": [],
+  "timestamp": "2026-06-24T12:00:00+00:00"
 }
 ```
 
@@ -266,7 +272,10 @@ X-API-Key: admin-secret-key-change-in-production
 | Header | Bắt buộc | Mô tả |
 |---|---|---|
 | `X-API-Key` | Có | API key của project (`pk_...`) hoặc admin key |
+| `Authorization` | (Admin endpoints) | `Bearer {JWT token}` từ `/api/auth/login` |
 | `X-User-Id` | Tùy chọn | UUID định danh người dùng (cho file ownership) |
+
+> Mọi response được bọc trong `ApiResponse<T>` envelope: `{ success, data, message, errors[], timestamp }`. Trích xuất `.data` để lấy payload.
 
 ### 5.1. Upload file (2 pha)
 
@@ -288,12 +297,18 @@ Content-Type: application/json
 **Response:**
 ```json
 {
-  "fileId": "f1e2d3c4-...",
-  "uploadUrl": "https://s3.amazonaws.com/bucket/projects/.../report.pdf?...",
-  "headers": {
-    "Content-Type": "application/pdf"
+  "success": true,
+  "data": {
+    "fileId": "f1e2d3c4-...",
+    "uploadUrl": "https://s3.amazonaws.com/bucket/projects/.../report.pdf?...",
+    "headers": {
+      "Content-Type": "application/pdf"
+    },
+    "expiredAt": "2026-06-19T08:05:00Z"
   },
-  "expiredAt": "2026-06-19T08:05:00Z"
+  "message": "Request processed successfully.",
+  "errors": [],
+  "timestamp": "2026-06-24T12:00:00+00:00"
 }
 ```
 
@@ -334,15 +349,21 @@ Content-Type: application/json
 **Response:**
 ```json
 {
-  "id": "f1e2d3c4-...",
-  "projectId": "a1b2c3d4-...",
-  "name": "report.pdf",
-  "extension": "pdf",
-  "contentType": "application/pdf",
-  "size": 102400,
-  "downloadUrl": "https://s3.amazonaws.com/bucket/...?...",
-  "createdAt": "2026-06-19T08:00:00Z",
-  "description": "Báo cáo tháng 6"
+  "success": true,
+  "data": {
+    "id": "f1e2d3c4-...",
+    "projectId": "a1b2c3d4-...",
+    "name": "report.pdf",
+    "extension": "pdf",
+    "contentType": "application/pdf",
+    "size": 102400,
+    "downloadUrl": "https://s3.amazonaws.com/bucket/...?...",
+    "createdAt": "2026-06-19T08:00:00Z",
+    "description": "Báo cáo tháng 6"
+  },
+  "message": "Request processed successfully.",
+  "errors": [],
+  "timestamp": "2026-06-24T12:00:00+00:00"
 }
 ```
 
@@ -359,7 +380,7 @@ GET /api/files/{fileId}?projectId={projectId}
 X-API-Key: admin-key
 ```
 
-**Response:** Trả về metadata + `downloadUrl` mới (presigned URL có thời hạn theo `DownloadExpirationMinutes`).
+**Response:** ApiResponse wrapping metadata + `downloadUrl` mới (presigned URL có thời hạn theo `DownloadExpirationMinutes`).
 
 ### 5.3. Danh sách file
 
@@ -448,7 +469,8 @@ httpClient.DefaultRequestHeaders.Add("X-User-Id", userId.ToString());
 var initResponse = await httpClient.PostAsJsonAsync(
     "https://api.example.com/api/files/init-upload",
     new { Name = "report.pdf", ContentType = "application/pdf", Size = 102400 });
-var init = await initResponse.Content.ReadFromJsonAsync<InitUploadResponse>();
+var initEnvelope = await initResponse.Content.ReadFromJsonAsync<ApiResponse<InitUploadResponse>>();
+var init = initEnvelope.Data;
 
 // Phase 2: Upload file to storage (S3/MinIO)
 using var fileStream = File.OpenRead("report.pdf");
@@ -464,7 +486,8 @@ var completeResponse = await httpClient.PostAsJsonAsync(
         Size = 102400,
         Description = "Báo cáo tháng 6"
     });
-var file = await completeResponse.Content.ReadFromJsonAsync<FileDto>();
+var fileEnvelope = await completeResponse.Content.ReadFromJsonAsync<ApiResponse<FileDto>>();
+var file = fileEnvelope.Data;
 ```
 
 ### 6.2. JavaScript / Fetch
@@ -482,7 +505,7 @@ const initRes = await fetch(`${API}/api/files/init-upload`, {
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ name: 'report.pdf', contentType: 'application/pdf', size: 102400 })
 });
-const { fileId, uploadUrl } = await initRes.json();
+const { data: { fileId, uploadUrl } } = await initRes.json();
 
 // Phase 2: Upload to S3
 await fetch(uploadUrl, {
@@ -500,7 +523,7 @@ const completeRes = await fetch(`${API}/api/files/complete`, {
     size: 102400, description: 'Báo cáo tháng 6'
   })
 });
-const fileDto = await completeRes.json();
+const { data: fileDto } = await completeRes.json();
 ```
 
 ---

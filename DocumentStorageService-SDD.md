@@ -34,6 +34,7 @@ Architecture:
 * Clean Architecture
 * CQRS
 * Provider Pattern
+* Result Pattern (no-throw error handling)
 
 ---
 
@@ -91,6 +92,13 @@ Infrastructure
         Local
 
 Shared
+    Results
+        ErrorType
+        AppError
+        Result
+    Contracts
+        ApiResponse
+        ErrorResponse
 ```
 
 ---
@@ -393,6 +401,82 @@ GET /api/files
 
 GET /api/files/user/{userId}
 
+POST /api/auth/login
+
+POST /api/projects
+
+GET /api/projects
+
+GET /api/projects/{id}
+
+PUT /api/projects/{id}
+
+PATCH /api/projects/{id}/active
+
+POST /api/projects/{id}/regenerate-key
+
+---
+
+# 15.5. Response Format (ApiResponse Envelope)
+
+Tất cả API response được bọc trong envelope `ApiResponse<T>`:
+
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "Request processed successfully.",
+  "errors": [],
+  "timestamp": "2026-06-24T12:00:00+00:00"
+}
+```
+
+Thành phần:
+
+| Field | Type | Mô tả |
+|---|---|---|
+| `success` | boolean | true nếu thành công, false nếu lỗi |
+| `data` | T? | Dữ liệu trả về (null khi lỗi) |
+| `message` | string | Thông báo mô tả kết quả |
+| `errors` | ErrorResponse[] | Danh sách lỗi (rỗng khi thành công) |
+| `timestamp` | DateTimeOffset | Thời điểm tạo response |
+
+Error response:
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "File with id '...' was not found.",
+  "errors": [
+    {
+      "code": "FILE_NOT_FOUND",
+      "message": "File with id '...' was not found.",
+      "detail": null,
+      "target": null
+    }
+  ],
+  "timestamp": "2026-06-24T12:00:00+00:00"
+}
+```
+
+Result Pattern (Application layer):
+
+- Handlers return `Result<T>` / `Result` thay vì throw exception
+- `Result.IsSuccess` / `Result.IsFailure` / `Result.Value` / `Result.Errors`
+- `AppError` với `ErrorType` enum xác định HTTP status code
+
+ErrorType → HTTP Status:
+
+| ErrorType | HTTP | Khi nào |
+|---|---|---|
+| Validation | 422 | Sai kiểu file, vượt size |
+| NotFound | 404 | File/project không tồn tại |
+| Conflict | 409 | Xung đột dữ liệu |
+| Unauthorized | 401 | Sai credentials |
+| Forbidden | 403 | Không có quyền |
+| Failure | 400 | Lỗi business logic khác |
+
 ---
 
 # 16. Search
@@ -475,15 +559,19 @@ Provider exception
 
 # 20. Exception Types
 
-FileNotFoundException
+Domain exceptions vẫn tồn tại nhưng được catch trong handler và convert sang `AppError`:
 
-StorageException
+| Domain Exception | Error Code | ErrorType | HTTP |
+|---|---|---|---|
+| FileNotFoundException | FILE_NOT_FOUND | NotFound | 404 |
+| ProjectNotFoundException | PROJECT_NOT_FOUND | NotFound | 404 |
+| InvalidFileTypeException | INVALID_FILE_TYPE | Validation | 422 |
+| UploadExpiredException | UPLOAD_EXPIRED | Failure | 400 |
+| PermissionDeniedException | PERMISSION_DENIED | Forbidden | 403 |
+| InvalidCredentialsException | INVALID_CREDENTIALS | Unauthorized | 401 |
+| StorageException | STORAGE_ERROR | Failure | 502 |
 
-InvalidFileTypeException
-
-UploadExpiredException
-
-PermissionDeniedException
+ExceptionHandlingMiddleware (fallback) catch các exception chưa được handler xử lý, trả về ApiResponse error format.
 
 ---
 

@@ -8,8 +8,9 @@ Dịch vụ lưu trữ tài liệu đa tenant, xây dựng trên ASP.NET Core 9 
 - **Multi-tenant**: Mỗi project có API key riêng, cô lập dữ liệu theo project
 - **Soft delete**: File bị xóa khỏi storage nhưng metadata vẫn giữ trong DB
 - **Đa storage provider**: Chuyển đổi giữa S3 / MinIO / Local chỉ bằng cấu hình
-- **Phân quyền**: Admin (toàn quyền) và Project User (scoped theo project)
+- **Phân quyền**: Admin (JWT, toàn quyền) và Project User (API key `pk_...`, scoped theo project)
 - **Tìm kiếm & phân trang**: Keyword, sort, paging trên metadata
+- **Response chuẩn**: Mọi API response bọc trong `ApiResponse<T>` envelope (`success`, `data`, `message`, `errors`, `timestamp`)
 
 ## Kiến trúc
 
@@ -43,11 +44,11 @@ src/
 ├── DocumentStorage.Application/      # CQRS handlers, DTOs, interfaces
 ├── DocumentStorage.Domain/           # Entities, enums, domain exceptions
 ├── DocumentStorage.Infrastructure/   # EF Core, storage providers, auth, caching
-└── DocumentStorage.Shared/           # Shared utilities (no dependencies)
+└── DocumentStorage.Shared/           # ApiResponse, ErrorResponse, Result, AppError, ErrorType
 
 tests/
 ├── DocumentStorage.Domain.Tests/     # 31 tests
-└── DocumentStorage.Application.Tests/# 49 tests
+└── DocumentStorage.Application.Tests/# 54 tests
 ```
 
 ## Bắt đầu nhanh
@@ -112,10 +113,11 @@ Xem chi tiết tại [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md).
 
 ## Bảo mật
 
-- Xác thực qua header `X-API-Key` (admin key hoặc project API key)
+- Xác thực: Admin = JWT (`/api/auth/login`), Project = API key (`X-API-Key`)
+- Response envelope: `ApiResponse<T>` cho mọi endpoint, Result pattern trong handlers
 - Path traversal protection trên Local storage
 - Presigned URL có thời hạn cho upload/download
 - Soft delete + EF Core query filter tự động
-- Exception details chỉ hiển thị cho domain exceptions
+- ExceptionHandlingMiddleware fallback → ApiResponse error format
 
 Xem chi tiết tại [DEPLOYMENT-GUIDE.md §7](DEPLOYMENT-GUIDE.md#7-bảo-mật).

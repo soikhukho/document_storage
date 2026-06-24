@@ -6,6 +6,31 @@ Tất cả thay đổi đáng chú ý của dự án DocumentStorageService.
 
 ---
 
+## [0.3.0] — 2026-06-24
+
+### Changed
+- **[Breaking]** Tất cả API response được bọc trong `ApiResponse<T>` envelope (`{ success, data, message, errors[], timestamp }`) — client cần trích xuất `.data` để lấy payload
+- **[Breaking]** Handler interfaces (`ICommandHandler`, `IQueryHandler`) trả về `Result<T>` / `Result` thay vì raw type — handlers không còn throw domain exceptions
+- **[Breaking]** `ExceptionHandlingMiddleware` trả về `ApiResponse` error format thay vì RFC 7807 Problem Details
+- 13 handlers refactor: return `Result.Success()` / `Result.Failure(AppError.X())` thay vì throw
+- 3 controllers dùng `this.ToActionResult(result)` thay vì `Ok(result)`
+- 8 test files cập nhật: assert `result.IsSuccess` / `result.IsFailure` thay vì `Assert.ThrowsAsync`
+
+### Added
+- `Shared/Results/ErrorType` — enum: Validation(422), NotFound(404), Conflict(409), Unauthorized(401), Forbidden(403), Failure(400)
+- `Shared/Results/AppError` — structured error với static factories theo ErrorType
+- `Shared/Results/Result` / `Result<T>` — Result pattern (IsSuccess, IsFailure, Value, Errors)
+- `Shared/Contracts/ApiResponse<T>` — response envelope cho mọi API endpoint
+- `Shared/Contracts/ErrorResponse` — error detail (code, message, detail, target)
+- `Api/Extensions/ResultMapperExtensions` — `ToActionResult()` mapper Result → ApiResponse + HTTP status
+- SDD §15.5 Response Format, §20 Exception Types updated với error code table
+
+### Removed
+- Raw DTO returns từ controllers (`Ok(result)` → `this.ToActionResult(result)`)
+- RFC 7807 Problem Details format trong `ExceptionHandlingMiddleware`
+
+---
+
 ## [0.2.0] — 2026-06-22
 
 ### Fixed
