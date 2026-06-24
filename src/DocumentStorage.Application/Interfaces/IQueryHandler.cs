@@ -1,3 +1,5 @@
+using DocumentStorage.Shared.Results;
+
 namespace DocumentStorage.Application.Interfaces;
 
 /// <summary>
@@ -5,5 +7,5 @@ namespace DocumentStorage.Application.Interfaces;
 /// </summary>
 public interface IQueryHandler<in TQuery, TResult>
 {
-    Task<TResult> HandleAsync(TQuery query, CancellationToken ct = default);
+    Task<Result<TResult>> HandleAsync(TQuery query, CancellationToken ct = default);
 }

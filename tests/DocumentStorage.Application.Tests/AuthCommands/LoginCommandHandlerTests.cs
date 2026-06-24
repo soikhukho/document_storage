@@ -1,10 +1,7 @@
 using DocumentStorage.Application.AuthCommands;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
-using DocumentStorage.Domain.Exceptions;
 using NSubstitute;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace DocumentStorage.Application.Tests.AuthCommands;
 
@@ -21,7 +18,7 @@ public class LoginCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ValidCredentials_ReturnsToken()
+    public async Task HandleAsync_ValidCredentials_ReturnsSuccessWithToken()
     {
         var user = AdminUser.Create("admin", "hash");
         var expiresAt = DateTime.UtcNow.AddHours(1);
@@ -31,46 +28,51 @@ public class LoginCommandHandlerTests
 
         var result = await _handler.HandleAsync(new LoginCommand("admin", "secret"));
 
-        Assert.Equal("token", result.AccessToken);
-        Assert.Equal(expiresAt, result.ExpiresAt);
-        Assert.Equal("Bearer", result.TokenType);
-        Assert.Equal("admin", result.Username);
+        Assert.True(result.IsSuccess);
+        Assert.Equal("token", result.Value!.AccessToken);
+        Assert.Equal(expiresAt, result.Value.ExpiresAt);
+        Assert.Equal("Bearer", result.Value.TokenType);
+        Assert.Equal("admin", result.Value.Username);
     }
 
     [Fact]
-    public async Task HandleAsync_UnknownUser_ThrowsInvalidCredentials()
+    public async Task HandleAsync_UnknownUser_ReturnsUnauthorizedFailure()
     {
         _users.GetByUsernameAsync("nobody", Arg.Any<CancellationToken>())
             .Returns((AdminUser?)null);
         _hasher.Verify(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
 
-        await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
-            _handler.HandleAsync(new LoginCommand("nobody", "secret")));
+        var result = await _handler.HandleAsync(new LoginCommand("nobody", "secret"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_CREDENTIALS", result.FirstError!.Code);
     }
 
     [Fact]
-    public async Task HandleAsync_WrongPassword_ThrowsInvalidCredentials()
+    public async Task HandleAsync_WrongPassword_ReturnsUnauthorizedFailure()
     {
         var user = AdminUser.Create("admin", "hash");
         _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(user);
         _hasher.Verify("wrong", "hash").Returns(false);
 
-        await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
-            _handler.HandleAsync(new LoginCommand("admin", "wrong")));
+        var result = await _handler.HandleAsync(new LoginCommand("admin", "wrong"));
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_CREDENTIALS", result.FirstError!.Code);
     }
 
     [Fact]
-    public async Task HandleAsync_InactiveUser_ThrowsInvalidCredentials()
+    public async Task HandleAsync_InactiveUser_ReturnsUnauthorizedFailure()
     {
         var user = AdminUser.Create("admin", "hash");
         user.Deactivate();
         _users.GetByUsernameAsync("admin", Arg.Any<CancellationToken>()).Returns(user);
         _hasher.Verify("secret", "hash").Returns(true);
 
-        await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
-            _handler.HandleAsync(new LoginCommand("admin", "secret")));
+        var result = await _handler.HandleAsync(new LoginCommand("admin", "secret"));
 
-        // JWT must never be issued for disabled accounts.
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_CREDENTIALS", result.FirstError!.Code);
         _jwt.DidNotReceive().GenerateToken(Arg.Any<AdminUser>());
     }
 
@@ -80,11 +82,9 @@ public class LoginCommandHandlerTests
         _users.GetByUsernameAsync("ghost", Arg.Any<CancellationToken>())
             .Returns((AdminUser?)null);
 
-        await Assert.ThrowsAsync<InvalidCredentialsException>(() =>
-            _handler.HandleAsync(new LoginCommand("ghost", "secret")));
+        var result = await _handler.HandleAsync(new LoginCommand("ghost", "secret"));
 
-        // Verify that we still ran the password verify step against empty hash,
-        // so response time for unknown user is similar to known-but-wrong password.
+        Assert.True(result.IsFailure);
         _hasher.Received(1).Verify("secret", string.Empty);
     }
 }

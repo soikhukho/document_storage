@@ -4,7 +4,6 @@ using DocumentStorage.Application.Queries;
 using DocumentStorage.Domain.Entities;
 using DocumentStorage.Domain.Enums;
 using NSubstitute;
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
 
 namespace DocumentStorage.Application.Tests.Queries;
 
@@ -25,7 +24,7 @@ public class GetFileByIdQueryHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_FileExists_ReturnsDtoWithDownloadUrl()
+    public async Task HandleAsync_FileExists_ReturnsSuccessWithDto()
     {
         var document = FileDocument.Create(
             ProjectId, "doc.pdf", "pdf", "application/pdf", 1024,
@@ -37,21 +36,23 @@ public class GetFileByIdQueryHandlerTests
 
         var result = await _handler.HandleAsync(new GetFileByIdQuery(ProjectId, FileId, UserId));
 
-        Assert.Equal(document.Id, result.Id);
-        Assert.Equal("doc.pdf", result.Name);
-        Assert.Equal("https://download/url", result.DownloadUrl);
-        Assert.Equal("test", result.Description);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(document.Id, result.Value!.Id);
+        Assert.Equal("doc.pdf", result.Value.Name);
+        Assert.Equal("https://download/url", result.Value.DownloadUrl);
+        Assert.Equal("test", result.Value.Description);
     }
 
     [Fact]
-    public async Task HandleAsync_FileNotFound_Throws()
+    public async Task HandleAsync_FileNotFound_ReturnsFailure()
     {
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>())
             .Returns((FileDocument?)null);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _handler.HandleAsync(new GetFileByIdQuery(ProjectId, FileId, UserId)));
+        var result = await _handler.HandleAsync(new GetFileByIdQuery(ProjectId, FileId, UserId));
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
         await _storage.DidNotReceive().GetDownloadUrlAsync(
             Arg.Any<string>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
     }

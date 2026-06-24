@@ -2,7 +2,7 @@ using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Application.ProjectCommands;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectQueries;
 
@@ -16,12 +16,15 @@ public class GetProjectByIdQueryHandler
         _repository = repository;
     }
 
-    public async Task<ProjectDto> HandleAsync(
+    public async Task<Result<ProjectDto>> HandleAsync(
         GetProjectByIdQuery query, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(query.ProjectId, ct).ConfigureAwait(false)
-            ?? throw new ProjectNotFoundException(query.ProjectId);
+        var project = await _repository.GetByIdAsync(query.ProjectId, ct).ConfigureAwait(false);
 
-        return CreateProjectCommandHandler.MapToDto(project);
+        if (project is null)
+            return Result<ProjectDto>.Failure(
+                AppError.NotFound("PROJECT_NOT_FOUND", $"Project with id '{query.ProjectId}' was not found."));
+
+        return Result<ProjectDto>.Success(CreateProjectCommandHandler.MapToDto(project));
     }
 }

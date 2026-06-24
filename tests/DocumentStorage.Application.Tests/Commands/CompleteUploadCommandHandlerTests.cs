@@ -2,10 +2,7 @@ using DocumentStorage.Application.Commands;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Enums;
-using DocumentStorage.Domain.Exceptions;
 using NSubstitute;
-using InvalidFileTypeException = DocumentStorage.Domain.Exceptions.InvalidFileTypeException;
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
 
 namespace DocumentStorage.Application.Tests.Commands;
 
@@ -37,13 +34,14 @@ public class CompleteUploadCommandHandlerTests
 
         var result = await _handler.HandleAsync(command);
 
-        Assert.NotEqual(Guid.Empty, result.Id);
-        Assert.Equal("doc.pdf", result.Name);
-        Assert.Equal("pdf", result.Extension);
-        Assert.Equal("application/pdf", result.ContentType);
-        Assert.Equal(1024, result.Size);
-        Assert.Equal("desc", result.Description);
-        Assert.Equal("https://download/url", result.DownloadUrl);
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(Guid.Empty, result.Value!.Id);
+        Assert.Equal("doc.pdf", result.Value.Name);
+        Assert.Equal("pdf", result.Value.Extension);
+        Assert.Equal("application/pdf", result.Value.ContentType);
+        Assert.Equal(1024, result.Value.Size);
+        Assert.Equal("desc", result.Value.Description);
+        Assert.Equal("https://download/url", result.Value.DownloadUrl);
 
         await _repo.Received(1).AddAsync(Arg.Is<Domain.Entities.FileDocument>(d =>
             d.UploadedBy == UserId && d.ProjectId == ProjectId), Arg.Any<CancellationToken>());
@@ -51,25 +49,29 @@ public class CompleteUploadCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_FileNotInStorage_ThrowsFileNotFound()
+    public async Task HandleAsync_FileNotInStorage_ReturnsNotFoundFailure()
     {
         _storage.ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(false);
 
         var command = new CompleteUploadCommand(ProjectId, FileId, "doc.pdf", "application/pdf", 1024, UserId);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() => _handler.HandleAsync(command));
+        var result = await _handler.HandleAsync(command);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
         await _repo.DidNotReceive().AddAsync(Arg.Any<Domain.Entities.FileDocument>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task HandleAsync_InvalidFileType_ThrowsBeforeStorageCheck()
+    public async Task HandleAsync_InvalidFileType_ReturnsValidationFailureBeforeStorageCheck()
     {
         var command = new CompleteUploadCommand(ProjectId, FileId, "virus.exe", "application/octet-stream", 1024, UserId);
 
-        await Assert.ThrowsAsync<InvalidFileTypeException>(() => _handler.HandleAsync(command));
+        var result = await _handler.HandleAsync(command);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_FILE_TYPE", result.FirstError!.Code);
         await _storage.DidNotReceive().ExistsAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 

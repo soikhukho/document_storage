@@ -1,6 +1,6 @@
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.AuthCommands;
 
@@ -21,22 +21,21 @@ public class LoginCommandHandler
         _jwtTokenService = jwtTokenService;
     }
 
-    public async Task<LoginResult> HandleAsync(
+    public async Task<Result<LoginResult>> HandleAsync(
         LoginCommand command, CancellationToken ct = default)
     {
-        // Lookup is case-insensitive to be friendly, hash compare is constant-time.
         var user = await _users.GetByUsernameAsync(command.Username, ct).ConfigureAwait(false);
 
-        // Run verify even when user is null to avoid timing-based user enumeration.
         var passwordHash = user?.PasswordHash ?? string.Empty;
         var passwordValid = _passwordHasher.Verify(command.Password, passwordHash)
             && user is not null;
 
         if (!passwordValid || !user!.IsActive)
-            throw new InvalidCredentialsException();
+            return Result<LoginResult>.Failure(
+                AppError.Unauthorized("INVALID_CREDENTIALS", "Invalid username or password."));
 
         var (token, expiresAt) = _jwtTokenService.GenerateToken(user);
 
-        return new LoginResult(token, expiresAt, "Bearer", user.Username);
+        return Result<LoginResult>.Success(new LoginResult(token, expiresAt, "Bearer", user.Username));
     }
 }

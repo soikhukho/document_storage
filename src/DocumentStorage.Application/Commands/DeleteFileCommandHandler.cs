@@ -1,7 +1,5 @@
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
-
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Commands;
 
@@ -22,7 +20,7 @@ public class DeleteFileCommandHandler
         _unitOfWork = unitOfWork;
     }
 
-    public async Task HandleAsync(DeleteFileCommand command, CancellationToken ct = default)
+    public async Task<Result> HandleAsync(DeleteFileCommand command, CancellationToken ct = default)
     {
         var document = command.UserId.HasValue
             ? await _repository.GetByIdAndUserAsync(
@@ -31,12 +29,15 @@ public class DeleteFileCommandHandler
                 command.FileId, command.ProjectId, ct).ConfigureAwait(false);
 
         if (document is null)
-            throw new FileNotFoundException(command.FileId);
+            return Result.Failure(
+                AppError.NotFound("FILE_NOT_FOUND", $"File with id '{command.FileId}' was not found."));
 
         document.SoftDelete();
         await _repository.UpdateAsync(document, ct).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
         await _storageProvider.DeleteAsync(document.StorageKey, ct).ConfigureAwait(false);
+
+        return Result.Success();
     }
 }

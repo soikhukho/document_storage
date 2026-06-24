@@ -3,7 +3,6 @@ using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
 using DocumentStorage.Domain.Enums;
 using NSubstitute;
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
 
 namespace DocumentStorage.Application.Tests.Commands;
 
@@ -31,8 +30,9 @@ public class DeleteFileCommandHandlerTests
             "user/key/doc.pdf", StorageProviderType.Local, UserId);
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>()).Returns(document);
 
-        await _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId));
+        var result = await _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId));
 
+        Assert.True(result.IsSuccess);
         await _storage.Received(1).DeleteAsync(document.StorageKey, Arg.Any<CancellationToken>());
         Assert.True(document.IsDeleted);
         Assert.NotNull(document.DeletedAt);
@@ -41,28 +41,29 @@ public class DeleteFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_FileNotFound_ThrowsAndDoesNotDeleteFromStorage()
+    public async Task HandleAsync_FileNotFound_ReturnsFailureAndDoesNotDeleteFromStorage()
     {
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>())
             .Returns((FileDocument?)null);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId)));
+        var result = await _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId));
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
         await _storage.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task HandleAsync_OtherUsersFile_ReturnsNullFromRepo_ThrowsFileNotFound()
+    public async Task HandleAsync_OtherUsersFile_ReturnsFailureFromRepo()
     {
-        // Repository scopes by projectId + userId — a file owned by another user returns null
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>())
             .Returns((FileDocument?)null);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId)));
+        var result = await _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId));
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
         await _storage.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

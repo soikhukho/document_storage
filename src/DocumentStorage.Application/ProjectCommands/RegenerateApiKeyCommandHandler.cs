@@ -1,7 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectCommands;
 
@@ -22,11 +22,14 @@ public class RegenerateApiKeyCommandHandler
         _cache = cache;
     }
 
-    public async Task<ProjectDto> HandleAsync(
+    public async Task<Result<ProjectDto>> HandleAsync(
         RegenerateApiKeyCommand command, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false)
-            ?? throw new ProjectNotFoundException(command.ProjectId);
+        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false);
+
+        if (project is null)
+            return Result<ProjectDto>.Failure(
+                AppError.NotFound("PROJECT_NOT_FOUND", $"Project with id '{command.ProjectId}' was not found."));
 
         var oldApiKey = project.ApiKey;
 
@@ -36,6 +39,6 @@ public class RegenerateApiKeyCommandHandler
 
         _cache.Invalidate(oldApiKey);
 
-        return CreateProjectCommandHandler.MapToDto(project);
+        return Result<ProjectDto>.Success(CreateProjectCommandHandler.MapToDto(project));
     }
 }

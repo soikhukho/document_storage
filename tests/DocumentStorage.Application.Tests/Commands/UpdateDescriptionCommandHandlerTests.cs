@@ -4,7 +4,6 @@ using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
 using DocumentStorage.Domain.Enums;
 using NSubstitute;
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
 
 namespace DocumentStorage.Application.Tests.Commands;
 
@@ -39,23 +38,26 @@ public class UpdateDescriptionCommandHandlerTests
         var result = await _handler.HandleAsync(
             new UpdateDescriptionCommand(ProjectId, FileId, UserId, "new desc"));
 
+        Assert.True(result.IsSuccess);
         Assert.Equal("new desc", document.Description);
-        Assert.Equal("new desc", result.Description);
-        Assert.Equal("https://download/url", result.DownloadUrl);
+        Assert.Equal("new desc", result.Value!.Description);
+        Assert.Equal("https://download/url", result.Value.DownloadUrl);
 
         await _repo.Received(1).UpdateAsync(document, Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task HandleAsync_FileNotFound_Throws()
+    public async Task HandleAsync_FileNotFound_ReturnsFailure()
     {
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>())
             .Returns((FileDocument?)null);
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
-            _handler.HandleAsync(new UpdateDescriptionCommand(ProjectId, FileId, UserId, "desc")));
+        var result = await _handler.HandleAsync(
+            new UpdateDescriptionCommand(ProjectId, FileId, UserId, "desc"));
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

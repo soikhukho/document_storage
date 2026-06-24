@@ -1,3 +1,5 @@
+using DocumentStorage.Shared.Results;
+
 namespace DocumentStorage.Application.Interfaces;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace DocumentStorage.Application.Interfaces;
 /// </summary>
 public interface ICommandHandler<in TCommand, TResult>
 {
-    Task<TResult> HandleAsync(TCommand command, CancellationToken ct = default);
+    Task<Result<TResult>> HandleAsync(TCommand command, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -13,5 +15,5 @@ public interface ICommandHandler<in TCommand, TResult>
 /// </summary>
 public interface ICommandHandler<in TCommand>
 {
-    Task HandleAsync(TCommand command, CancellationToken ct = default);
+    Task<Result> HandleAsync(TCommand command, CancellationToken ct = default);
 }

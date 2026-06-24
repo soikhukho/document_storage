@@ -2,9 +2,7 @@ using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
-using DocumentStorage.Domain.Exceptions;
-
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Commands;
 
@@ -28,16 +26,31 @@ public class CompleteUploadCommandHandler
         _options = options;
     }
 
-    public async Task<FileDto> HandleAsync(
+    public async Task<Result<FileDto>> HandleAsync(
         CompleteUploadCommand command, CancellationToken ct = default)
     {
-        var extension = FileValidator.ValidateAndExtractExtension(
-            command.Name, command.ContentType, command.Size, _options);
+        string extension;
+        try
+        {
+            extension = FileValidator.ValidateAndExtractExtension(
+                command.Name, command.ContentType, command.Size, _options);
+        }
+        catch (ArgumentException ex)
+        {
+            return Result<FileDto>.Failure(
+                AppError.Validation("INVALID_FILE_SIZE", ex.Message));
+        }
+        catch (Domain.Exceptions.InvalidFileTypeException ex)
+        {
+            return Result<FileDto>.Failure(
+                AppError.Validation("INVALID_FILE_TYPE", ex.Message));
+        }
 
         var storageKey = StorageKeyGenerator.Generate(command.ProjectId, command.UserId, command.FileId, extension);
 
         if (!await _storageProvider.ExistsAsync(storageKey, ct).ConfigureAwait(false))
-            throw new FileNotFoundException(command.FileId);
+            return Result<FileDto>.Failure(
+                AppError.NotFound("FILE_NOT_FOUND", $"File with id '{command.FileId}' was not found."));
 
         var document = FileDocument.Create(
             command.ProjectId,
@@ -56,6 +69,6 @@ public class CompleteUploadCommandHandler
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
             storageKey, _options.DownloadExpirationMinutes, ct).ConfigureAwait(false);
 
-        return FileMapper.ToDto(document, downloadUrl);
+        return Result<FileDto>.Success(FileMapper.ToDto(document, downloadUrl));
     }
 }

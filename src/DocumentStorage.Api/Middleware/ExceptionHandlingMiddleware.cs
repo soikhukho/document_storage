@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.Text.Json;
 using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Contracts;
 using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
 
 namespace DocumentStorage.Api.Middleware;
 
 /// <summary>
-/// Global exception handler — maps domain exceptions to RFC 7807 Problem Details.
+/// Global exception handler — maps unhandled exceptions to standardized ApiResponse error format.
+/// Acts as a safety net for exceptions not caught by the Result pattern.
 /// </summary>
 public sealed class ExceptionHandlingMiddleware
 {
@@ -33,17 +35,18 @@ public sealed class ExceptionHandlingMiddleware
 
     private async Task HandleAsync(HttpContext context, Exception ex)
     {
-        var (status, title, exposeMessage) = ex switch
+        var (status, code, message) = ex switch
         {
-            FileNotFoundException       => (404, "File Not Found", true),
-            ProjectNotFoundException    => (404, "Project Not Found", true),
-            InvalidFileTypeException    => (400, "Invalid File Type", true),
-            UploadExpiredException      => (410, "Upload Expired", true),
-            PermissionDeniedException   => (403, "Permission Denied", true),
-            StorageException            => (502, "Storage Error", true),
-            UnauthorizedAccessException  => (401, "Unauthorized", true),
-            ArgumentException           => (400, "Validation Error", false),
-            _                           => (500, "Internal Server Error", false)
+            FileNotFoundException       => (404, "FILE_NOT_FOUND", ex.Message),
+            ProjectNotFoundException    => (404, "PROJECT_NOT_FOUND", ex.Message),
+            InvalidFileTypeException    => (400, "INVALID_FILE_TYPE", ex.Message),
+            UploadExpiredException      => (410, "UPLOAD_EXPIRED", ex.Message),
+            PermissionDeniedException   => (403, "PERMISSION_DENIED", ex.Message),
+            InvalidCredentialsException => (401, "INVALID_CREDENTIALS", ex.Message),
+            StorageException            => (502, "STORAGE_ERROR", ex.Message),
+            UnauthorizedAccessException  => (401, "UNAUTHORIZED", ex.Message),
+            ArgumentException           => (400, "VALIDATION_ERROR", ex.Message),
+            _                           => (500, "INTERNAL_ERROR", "An unexpected error occurred.")
         };
 
         if (status >= 500)
@@ -52,18 +55,19 @@ public sealed class ExceptionHandlingMiddleware
             _logger.LogWarning("Handled {Type}: {Message}", ex.GetType().Name, ex.Message);
 
         context.Response.StatusCode = status;
-        context.Response.ContentType = "application/problem+json";
+        context.Response.ContentType = "application/json";
 
-        var body = new
+        var response = ApiResponse.Fail(message, new ErrorResponse
         {
-            type = $"https://httpstatuses.io/{status}",
-            title,
-            status,
-            detail = exposeMessage ? ex.Message : title,
-            instance = context.Request.Path.Value,
-            traceId = Activity.Current?.Id ?? context.TraceIdentifier
+            Code = code,
+            Message = message
+        });
+
+        var jsonOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
 
-        await context.Response.WriteAsync(JsonSerializer.Serialize(body));
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response, jsonOptions));
     }
 }

@@ -1,7 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectCommands;
 
@@ -19,16 +19,19 @@ public class UpdateProjectCommandHandler
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<ProjectDto> HandleAsync(
+    public async Task<Result<ProjectDto>> HandleAsync(
         UpdateProjectCommand command, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false)
-            ?? throw new ProjectNotFoundException(command.ProjectId);
+        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false);
+
+        if (project is null)
+            return Result<ProjectDto>.Failure(
+                AppError.NotFound("PROJECT_NOT_FOUND", $"Project with id '{command.ProjectId}' was not found."));
 
         project.Update(command.Name, command.Description);
         await _repository.UpdateAsync(project, ct).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return CreateProjectCommandHandler.MapToDto(project);
+        return Result<ProjectDto>.Success(CreateProjectCommandHandler.MapToDto(project));
     }
 }

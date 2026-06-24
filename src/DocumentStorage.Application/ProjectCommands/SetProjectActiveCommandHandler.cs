@@ -1,6 +1,6 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectCommands;
 
@@ -21,11 +21,14 @@ public class SetProjectActiveCommandHandler
         _cache = cache;
     }
 
-    public async Task HandleAsync(
+    public async Task<Result> HandleAsync(
         SetProjectActiveCommand command, CancellationToken ct = default)
     {
-        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false)
-            ?? throw new ProjectNotFoundException(command.ProjectId);
+        var project = await _repository.GetByIdAsync(command.ProjectId, ct).ConfigureAwait(false);
+
+        if (project is null)
+            return Result.Failure(
+                AppError.NotFound("PROJECT_NOT_FOUND", $"Project with id '{command.ProjectId}' was not found."));
 
         if (command.IsActive)
             project.Activate();
@@ -36,5 +39,7 @@ public class SetProjectActiveCommandHandler
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
         _cache.Invalidate(project.ApiKey);
+
+        return Result.Success();
     }
 }

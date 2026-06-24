@@ -1,6 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Queries;
 
@@ -14,7 +15,7 @@ public class SearchFilesQueryHandler
         _repository = repository;
     }
 
-    public async Task<PagedResult<FileDto>> HandleAsync(
+    public async Task<Result<PagedResult<FileDto>>> HandleAsync(
         SearchFilesQuery query, CancellationToken ct = default)
     {
         var (items, totalCount) = await _repository.SearchAsync(
@@ -27,12 +28,11 @@ public class SearchFilesQueryHandler
             query.SortDirection,
             ct).ConfigureAwait(false);
 
-        // DownloadUrl is intentionally empty for list results.
-        // Clients should call GET /api/files/{id} for a fresh presigned download URL.
         var dtos = items
             .Select(d => FileMapper.ToDto(d, string.Empty))
             .ToList();
 
-        return PagedResult<FileDto>.Create(dtos, query.Page, query.PageSize, totalCount);
+        return Result<PagedResult<FileDto>>.Success(
+            PagedResult<FileDto>.Create(dtos, query.Page, query.PageSize, totalCount));
     }
 }

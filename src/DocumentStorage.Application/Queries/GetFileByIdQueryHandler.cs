@@ -1,9 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
-
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Queries;
 
@@ -24,18 +22,19 @@ public class GetFileByIdQueryHandler
         _options = options;
     }
 
-    public async Task<FileDto> HandleAsync(GetFileByIdQuery query, CancellationToken ct = default)
+    public async Task<Result<FileDto>> HandleAsync(GetFileByIdQuery query, CancellationToken ct = default)
     {
         var document = query.UserId.HasValue
             ? await _repository.GetByIdAndUserAsync(query.FileId, query.ProjectId, query.UserId.Value, ct).ConfigureAwait(false)
             : await _repository.GetByIdAsync(query.FileId, query.ProjectId, ct).ConfigureAwait(false);
 
         if (document is null)
-            throw new FileNotFoundException(query.FileId);
+            return Result<FileDto>.Failure(
+                AppError.NotFound("FILE_NOT_FOUND", $"File with id '{query.FileId}' was not found."));
 
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
             document.StorageKey, _options.DownloadExpirationMinutes, ct).ConfigureAwait(false);
 
-        return FileMapper.ToDto(document, downloadUrl);
+        return Result<FileDto>.Success(FileMapper.ToDto(document, downloadUrl));
     }
 }

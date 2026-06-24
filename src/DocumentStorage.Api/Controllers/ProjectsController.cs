@@ -1,11 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using DocumentStorage.Api.Attributes;
+using DocumentStorage.Api.Extensions;
 using DocumentStorage.Api.Models;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Application.ProjectCommands;
 using DocumentStorage.Application.ProjectQueries;
 using DocumentStorage.Application.Queries;
+using DocumentStorage.Shared.Contracts;
+using DocumentStorage.Shared.Results;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DocumentStorage.Api.Controllers;
@@ -41,7 +44,7 @@ public class ProjectsController : ControllerBase
     {
         var command = new CreateProjectCommand(request.Name, request.Description);
         var result = await handler.HandleAsync(command, ct);
-        return Ok(result);
+        return this.ToActionResult(result, successStatus: 201);
     }
 
     /// <summary>
@@ -57,7 +60,7 @@ public class ProjectsController : ControllerBase
     {
         var query = new GetAllProjectsQuery(page, pageSize);
         var result = await handler.HandleAsync(query, ct);
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 
     /// <summary>
@@ -73,7 +76,7 @@ public class ProjectsController : ControllerBase
     {
         var command = new UpdateProjectCommand(id, request.Name, request.Description);
         var result = await handler.HandleAsync(command, ct);
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 
     /// <summary>
@@ -88,8 +91,8 @@ public class ProjectsController : ControllerBase
         CancellationToken ct)
     {
         var command = new SetProjectActiveCommand(id, isActive);
-        await handler.HandleAsync(command, ct);
-        return NoContent();
+        var result = await handler.HandleAsync(command, ct);
+        return this.ToActionResult(result, successStatus: 204);
     }
 
     /// <summary>
@@ -104,14 +107,13 @@ public class ProjectsController : ControllerBase
     {
         var command = new RegenerateApiKeyCommand(id);
         var result = await handler.HandleAsync(command, ct);
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 
     // ── Mixed access endpoints ──
 
     /// <summary>
     /// Get a project by id.
-    /// Admin: any project. User: only their own.
     /// </summary>
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(
@@ -120,20 +122,19 @@ public class ProjectsController : ControllerBase
         CancellationToken ct)
     {
         if (!IsAdmin && id != _currentProject.ProjectId)
-            return StatusCode(403, new { title = "Forbidden", detail = "You can only access your own project." });
+            return StatusCode(403, ApiResponse.Fail("You can only access your own project."));
 
         var query = new GetProjectByIdQuery(id);
         var result = await handler.HandleAsync(query, ct);
 
-        if (!IsAdmin)
-            return Ok(result with { ApiKey = "" });
+        if (result.IsSuccess && !IsAdmin)
+            return this.ToActionResult(Result<ProjectDto>.Success(result.Value! with { ApiKey = "" }));
 
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 
     /// <summary>
     /// List files in a specific project.
-    /// Admin: any project. User: only their own.
     /// </summary>
     [HttpGet("{id:guid}/files")]
     public async Task<IActionResult> GetProjectFiles(
@@ -147,12 +148,12 @@ public class ProjectsController : ControllerBase
         [FromQuery] string? sortDirection = "asc")
     {
         if (!IsAdmin && id != _currentProject.ProjectId)
-            return StatusCode(403, new { title = "Forbidden", detail = "You can only access your own project." });
+            return StatusCode(403, ApiResponse.Fail("You can only access your own project."));
 
         var query = new SearchFilesQuery(
             id, keyword, null, page, pageSize, sortBy, sortDirection);
 
         var result = await handler.HandleAsync(query, ct);
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 }

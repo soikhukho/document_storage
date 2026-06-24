@@ -2,6 +2,7 @@ using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectCommands;
 
@@ -19,7 +20,7 @@ public class CreateProjectCommandHandler
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<ProjectDto> HandleAsync(
+    public async Task<Result<ProjectDto>> HandleAsync(
         CreateProjectCommand command, CancellationToken ct = default)
     {
         var project = Project.Create(command.Name, command.Description);
@@ -27,7 +28,7 @@ public class CreateProjectCommandHandler
         await _repository.AddAsync(project, ct).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 
-        return MapToDto(project);
+        return Result<ProjectDto>.Success(MapToDto(project));
     }
 
     internal static ProjectDto MapToDto(Project project) => new(

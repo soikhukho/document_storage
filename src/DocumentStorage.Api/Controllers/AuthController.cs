@@ -1,3 +1,4 @@
+using DocumentStorage.Api.Extensions;
 using DocumentStorage.Api.Models;
 using DocumentStorage.Application.AuthCommands;
 using DocumentStorage.Application.DTOs;
@@ -21,6 +22,6 @@ public class AuthController : ControllerBase
     {
         var command = new LoginCommand(request.Username, request.Password);
         var result = await handler.HandleAsync(command, ct);
-        return Ok(result);
+        return this.ToActionResult(result);
     }
 }

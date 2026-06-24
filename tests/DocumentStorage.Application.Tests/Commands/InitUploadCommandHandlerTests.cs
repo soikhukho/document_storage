@@ -1,7 +1,8 @@
 using DocumentStorage.Application.Commands;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
+using DocumentStorage.Domain.Entities;
+using DocumentStorage.Domain.Enums;
 using NSubstitute;
 
 namespace DocumentStorage.Application.Tests.Commands;
@@ -21,7 +22,7 @@ public class InitUploadCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ValidFile_ReturnsResponseWithUploadUrl()
+    public async Task HandleAsync_ValidFile_ReturnsSuccessWithUploadUrl()
     {
         var instruction = new UploadInstruction(
             "https://s3.amazonaws.com/bucket/key",
@@ -36,10 +37,11 @@ public class InitUploadCommandHandlerTests
 
         var result = await _handler.HandleAsync(command);
 
-        Assert.NotEqual(Guid.Empty, result.FileId);
-        Assert.Equal(instruction.UploadUrl, result.UploadUrl);
-        Assert.Equal(instruction.ExpiredAt, result.ExpiredAt);
-        Assert.Equal(instruction.Headers, result.Headers);
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(Guid.Empty, result.Value!.FileId);
+        Assert.Equal(instruction.UploadUrl, result.Value.UploadUrl);
+        Assert.Equal(instruction.ExpiredAt, result.Value.ExpiredAt);
+        Assert.Equal(instruction.Headers, result.Value.Headers);
     }
 
     [Fact]
@@ -62,25 +64,29 @@ public class InitUploadCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_DisallowedExtension_ThrowsInvalidFileType()
+    public async Task HandleAsync_DisallowedExtension_ReturnsValidationFailure()
     {
         var command = new InitUploadCommand(ProjectId, "virus.exe", "application/octet-stream", 1024, UserId);
 
-        await Assert.ThrowsAsync<InvalidFileTypeException>(() => _handler.HandleAsync(command));
+        var result = await _handler.HandleAsync(command);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_FILE_TYPE", result.FirstError!.Code);
         await _storage.DidNotReceive().InitUploadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<long>(),
             Arg.Any<int>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task HandleAsync_ExceedsMaxSize_ThrowsArgument()
+    public async Task HandleAsync_ExceedsMaxSize_ReturnsValidationFailure()
     {
         var command = new InitUploadCommand(ProjectId, "big.pdf", "application/pdf",
             _options.MaxUploadSizeBytes + 1, UserId);
 
-        await Assert.ThrowsAsync<ArgumentException>(() => _handler.HandleAsync(command));
+        var result = await _handler.HandleAsync(command);
 
+        Assert.True(result.IsFailure);
+        Assert.Equal("INVALID_FILE_SIZE", result.FirstError!.Code);
         await _storage.DidNotReceive().InitUploadAsync(
             Arg.Any<string>(), Arg.Any<string>(), Arg.Any<long>(),
             Arg.Any<int>(), Arg.Any<CancellationToken>());

@@ -36,10 +36,11 @@ public class GetFilesByUserQueryHandlerTests
         var result = await _handler.HandleAsync(
             new GetFilesByUserQuery(ProjectId, UserId, Page: 1, PageSize: 10));
 
-        Assert.Equal(3, result.Items.Count);
-        Assert.Equal(3, result.TotalCount);
-        Assert.Equal(1, result.TotalPages);
-        Assert.All(result.Items, dto => Assert.Equal(string.Empty, dto.DownloadUrl));
+        Assert.True(result.IsSuccess);
+        Assert.Equal(3, result.Value!.Items.Count);
+        Assert.Equal(3, result.Value.TotalCount);
+        Assert.Equal(1, result.Value.TotalPages);
+        Assert.All(result.Value.Items, dto => Assert.Equal(string.Empty, dto.DownloadUrl));
     }
 
     [Fact]
@@ -65,7 +66,8 @@ public class GetFilesByUserQueryHandlerTests
 
         var result = await _handler.HandleAsync(new GetFilesByUserQuery(ProjectId, UserId));
 
-        Assert.Empty(result.Items);
-        Assert.Equal(0, result.TotalCount);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+        Assert.Equal(0, result.Value.TotalCount);
     }
 }

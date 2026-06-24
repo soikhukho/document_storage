@@ -2,6 +2,7 @@ using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Application.ProjectCommands;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.ProjectQueries;
 
@@ -15,7 +16,7 @@ public class GetAllProjectsQueryHandler
         _repository = repository;
     }
 
-    public async Task<PagedResult<ProjectDto>> HandleAsync(
+    public async Task<Result<PagedResult<ProjectDto>>> HandleAsync(
         GetAllProjectsQuery query, CancellationToken ct = default)
     {
         var (items, totalCount) = await _repository.GetAllAsync(
@@ -25,6 +26,7 @@ public class GetAllProjectsQueryHandler
             .Select(CreateProjectCommandHandler.MapToDto)
             .ToList();
 
-        return PagedResult<ProjectDto>.Create(dtos, query.Page, query.PageSize, totalCount);
+        return Result<PagedResult<ProjectDto>>.Success(
+            PagedResult<ProjectDto>.Create(dtos, query.Page, query.PageSize, totalCount));
     }
 }

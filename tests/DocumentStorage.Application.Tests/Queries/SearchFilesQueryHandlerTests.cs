@@ -35,12 +35,13 @@ public class SearchFilesQueryHandlerTests
         var result = await _handler.HandleAsync(
             new SearchFilesQuery(ProjectId, "a", UserId, Page: 1, PageSize: 20));
 
-        Assert.Equal(2, result.Items.Count);
-        Assert.Equal(1, result.Page);
-        Assert.Equal(20, result.PageSize);
-        Assert.Equal(50, result.TotalCount);
-        Assert.Equal(3, result.TotalPages);
-        Assert.All(result.Items, dto => Assert.Equal(string.Empty, dto.DownloadUrl));
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.Items.Count);
+        Assert.Equal(1, result.Value.Page);
+        Assert.Equal(20, result.Value.PageSize);
+        Assert.Equal(50, result.Value.TotalCount);
+        Assert.Equal(3, result.Value.TotalPages);
+        Assert.All(result.Value.Items, dto => Assert.Equal(string.Empty, dto.DownloadUrl));
     }
 
     [Fact]
@@ -53,9 +54,10 @@ public class SearchFilesQueryHandlerTests
         var result = await _handler.HandleAsync(
             new SearchFilesQuery(ProjectId, null, UserId));
 
-        Assert.Empty(result.Items);
-        Assert.Equal(0, result.TotalCount);
-        Assert.Equal(0, result.TotalPages);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value!.Items);
+        Assert.Equal(0, result.Value.TotalCount);
+        Assert.Equal(0, result.Value.TotalPages);
     }
 
     [Fact]

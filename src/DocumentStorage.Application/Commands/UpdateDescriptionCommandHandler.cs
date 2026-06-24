@@ -1,9 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
-using DocumentStorage.Domain.Exceptions;
-
-using FileNotFoundException = DocumentStorage.Domain.Exceptions.FileNotFoundException;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Commands;
 
@@ -27,7 +25,7 @@ public class UpdateDescriptionCommandHandler
         _options = options;
     }
 
-    public async Task<FileDto> HandleAsync(
+    public async Task<Result<FileDto>> HandleAsync(
         UpdateDescriptionCommand command, CancellationToken ct = default)
     {
         var document = command.UserId.HasValue
@@ -37,7 +35,8 @@ public class UpdateDescriptionCommandHandler
                 command.FileId, command.ProjectId, ct).ConfigureAwait(false);
 
         if (document is null)
-            throw new FileNotFoundException(command.FileId);
+            return Result<FileDto>.Failure(
+                AppError.NotFound("FILE_NOT_FOUND", $"File with id '{command.FileId}' was not found."));
 
         document.UpdateDescription(command.Description);
         await _repository.UpdateAsync(document, ct).ConfigureAwait(false);
@@ -46,6 +45,6 @@ public class UpdateDescriptionCommandHandler
         var downloadUrl = await _storageProvider.GetDownloadUrlAsync(
             document.StorageKey, _options.DownloadExpirationMinutes, ct).ConfigureAwait(false);
 
-        return FileMapper.ToDto(document, downloadUrl);
+        return Result<FileDto>.Success(FileMapper.ToDto(document, downloadUrl));
     }
 }

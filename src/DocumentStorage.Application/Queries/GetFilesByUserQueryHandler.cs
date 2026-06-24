@@ -1,6 +1,7 @@
 using DocumentStorage.Application.Common;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
+using DocumentStorage.Shared.Results;
 
 namespace DocumentStorage.Application.Queries;
 
@@ -14,7 +15,7 @@ public class GetFilesByUserQueryHandler
         _repository = repository;
     }
 
-    public async Task<PagedResult<FileDto>> HandleAsync(
+    public async Task<Result<PagedResult<FileDto>>> HandleAsync(
         GetFilesByUserQuery query, CancellationToken ct = default)
     {
         var (items, totalCount) = await _repository.SearchAsync(
@@ -24,6 +25,7 @@ public class GetFilesByUserQueryHandler
             .Select(d => FileMapper.ToDto(d, string.Empty))
             .ToList();
 
-        return PagedResult<FileDto>.Create(dtos, query.Page, query.PageSize, totalCount);
+        return Result<PagedResult<FileDto>>.Success(
+            PagedResult<FileDto>.Create(dtos, query.Page, query.PageSize, totalCount));
     }
 }
