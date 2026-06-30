@@ -6,7 +6,9 @@ Dịch vụ lưu trữ tài liệu đa tenant, xây dựng trên ASP.NET Core 9 
 
 - **Upload 2 pha**: Client lấy presigned URL → upload trực tiếp lên storage → API lưu metadata
 - **Multi-tenant**: Mỗi project có API key riêng, cô lập dữ liệu theo project
-- **Soft delete**: File bị xóa khỏi storage nhưng metadata vẫn giữ trong DB
+- **Trash bin (thùng rác)**: Soft delete giữ S3 object → có thể khôi phục (restore) hoặc xóa vĩnh viễn (purge)
+- **FolderName per project**: Mỗi project có thư mục riêng trong storage (`{FolderName}/{fileName}`), ASCII-only, unique
+- **Duplicate filename check**: Chặn upload trùng tên file trước khi cấp presigned URL (409 Conflict)
 - **Đa storage provider**: Chuyển đổi giữa S3 / MinIO / Local chỉ bằng cấu hình
 - **Phân quyền**: Admin (JWT, toàn quyền) và Project User (API key `pk_...`, scoped theo project)
 - **Tìm kiếm & phân trang**: Keyword, sort, paging trên metadata
@@ -48,7 +50,7 @@ src/
 
 tests/
 ├── DocumentStorage.Domain.Tests/     # 31 tests
-└── DocumentStorage.Application.Tests/# 54 tests
+└── DocumentStorage.Application.Tests/# 65 tests
 ```
 
 ## Bắt đầu nhanh
@@ -117,7 +119,8 @@ Xem chi tiết tại [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md).
 - Response envelope: `ApiResponse<T>` cho mọi endpoint, Result pattern trong handlers
 - Path traversal protection trên Local storage
 - Presigned URL có thời hạn cho upload/download
-- Soft delete + EF Core query filter tự động
+- Soft delete + trash bin: S3 object được giữ khi soft-delete, có thể restore hoặc purge vĩnh viễn (có reference count check)
+- EF Core query filter tự động ẩn file đã soft-delete
 - ExceptionHandlingMiddleware fallback → ApiResponse error format
 
 Xem chi tiết tại [DEPLOYMENT-GUIDE.md §7](DEPLOYMENT-GUIDE.md#7-bảo-mật).
