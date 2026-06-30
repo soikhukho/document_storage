@@ -31,3 +31,6 @@ uploads/
 # OS
 Thumbs.db
 .DS_Store
+
+# Local scratch / test projects
+/tmp/
