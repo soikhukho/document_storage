@@ -42,7 +42,7 @@ public class ProjectsController : ControllerBase
         [FromServices] ICommandHandler<CreateProjectCommand, ProjectDto> handler,
         CancellationToken ct)
     {
-        var command = new CreateProjectCommand(request.Name, request.Description);
+        var command = new CreateProjectCommand(request.Name, request.FolderName, request.Description);
         var result = await handler.HandleAsync(command, ct);
         return this.ToActionResult(result, successStatus: 201);
     }

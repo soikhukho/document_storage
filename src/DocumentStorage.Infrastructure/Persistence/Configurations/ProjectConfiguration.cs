@@ -16,6 +16,10 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasMaxLength(200)
             .IsRequired();
 
+        builder.Property(x => x.FolderName)
+            .HasMaxLength(100)
+            .IsRequired();
+
         builder.Property(x => x.Description)
             .IsRequired();
 
@@ -34,5 +38,9 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.HasIndex(x => x.ApiKey)
             .IsUnique()
             .HasDatabaseName("IX_Projects_ApiKey");
+
+        builder.HasIndex(x => x.FolderName)
+            .IsUnique()
+            .HasDatabaseName("IX_Projects_FolderName");
     }
 }

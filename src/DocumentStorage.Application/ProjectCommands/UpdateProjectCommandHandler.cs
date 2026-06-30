@@ -28,7 +28,16 @@ public class UpdateProjectCommandHandler
             return Result<ProjectDto>.Failure(
                 AppError.NotFound("PROJECT_NOT_FOUND", $"Project with id '{command.ProjectId}' was not found."));
 
-        project.Update(command.Name, command.Description);
+        try
+        {
+            project.Update(command.Name, command.Description);
+        }
+        catch (ArgumentException ex)
+        {
+            return Result<ProjectDto>.Failure(
+                AppError.Validation("INVALID_PROJECT", ex.Message));
+        }
+
         await _repository.UpdateAsync(project, ct).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
 

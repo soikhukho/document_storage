@@ -18,9 +18,17 @@ public static class DependencyInjection
         this IServiceCollection services, IConfiguration configuration)
     {
         // ── Storage options (SDD §18) ──
-        var storageOptions = configuration
-            .GetSection(StorageOptions.SectionName)
-            .Get<StorageOptions>() ?? new StorageOptions();
+        var storageSection = configuration.GetSection(StorageOptions.SectionName);
+        var storageOptions = storageSection.Get<StorageOptions>() ?? new StorageOptions();
+
+        // Explicitly read Provider as string to handle enum conversion
+        var providerString = storageSection["Provider"];
+        if (!string.IsNullOrEmpty(providerString)
+            && Enum.TryParse<StorageProviderType>(providerString, ignoreCase: true, out var providerEnum))
+        {
+            storageOptions.Provider = providerEnum;
+        }
+
         services.AddSingleton(storageOptions);
 
         // ── EF Core (PostgreSQL or SQL Server) ──

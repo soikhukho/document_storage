@@ -1,19 +1,26 @@
 namespace DocumentStorage.Application.Common;
 
 /// <summary>
-/// Generates deterministic storage keys (SDD §6 Step 2).
-/// Format: projects/{projectId}/users/{userId}/{year}/{month}/{fileId}.{extension}
+/// Generates storage keys for object storage.
+/// Format: {projectName}/{fileName}
+/// Flat structure: bucket → project folder → file (admin-friendly browsing).
 /// </summary>
-/// <remarks>
-/// This format is a storage contract. Changing it after files exist
-/// will orphan stored objects — existing keys must continue to resolve.
-/// </remarks>
 public static class StorageKeyGenerator
 {
-    public static string Generate(Guid projectId, Guid userId, Guid fileId, string extension)
+    public static string Generate(string projectName, string fileName)
     {
-        var now = DateTime.UtcNow;
-        var ext = extension.TrimStart('.').ToLowerInvariant();
-        return $"projects/{projectId}/users/{userId}/{now:yyyy}/{now:MM}/{fileId}.{ext}";
+        var safeProject = SanitizeSegment(projectName);
+        var safeFile = SanitizeSegment(fileName);
+        return $"{safeProject}/{safeFile}";
+    }
+
+    /// <summary>
+    /// Replaces path separators in a segment so it never creates unintended sub-folders.
+    /// </summary>
+    private static string SanitizeSegment(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "_";
+        return value.Trim().Replace('/', '_').Replace('\\', '_');
     }
 }

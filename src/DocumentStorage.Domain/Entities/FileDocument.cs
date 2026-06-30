@@ -54,8 +54,6 @@ public class FileDocument
             throw new ArgumentException("Storage key is required.", nameof(storageKey));
         if (!Enum.IsDefined(provider))
             throw new ArgumentOutOfRangeException(nameof(provider), "Unknown storage provider.");
-        if (uploadedBy == Guid.Empty)
-            throw new ArgumentException("UploadedBy must be a valid user id.", nameof(uploadedBy));
 
         return new FileDocument
         {

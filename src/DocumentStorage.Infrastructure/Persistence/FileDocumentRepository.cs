@@ -21,6 +21,48 @@ public class FileDocumentRepository : IFileDocumentRepository
         => _db.FileDocuments
             .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId && x.UploadedBy == userId, ct);
 
+    public Task<bool> ExistsByNameAsync(Guid projectId, string name, CancellationToken ct = default)
+        => _db.FileDocuments.AnyAsync(x => x.ProjectId == projectId && x.Name == name, ct);
+
+    public Task<FileDocument?> GetDeletedByIdAsync(Guid id, Guid projectId, CancellationToken ct = default)
+        => _db.FileDocuments
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(x => x.Id == id && x.ProjectId == projectId && x.IsDeleted, ct);
+
+    public async Task<(IReadOnlyList<FileDocument> Items, int TotalCount)> GetTrashAsync(
+        Guid projectId, Guid? userId, string? keyword,
+        int page, int pageSize, string? sortBy, string? sortDirection,
+        CancellationToken ct = default)
+    {
+        IQueryable<FileDocument> query = _db.FileDocuments
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(x => x.ProjectId == projectId && x.IsDeleted);
+
+        if (userId.HasValue)
+            query = query.Where(x => x.UploadedBy == userId.Value);
+
+        if (!string.IsNullOrWhiteSpace(keyword))
+        {
+            var kw = keyword.Trim();
+            query = query.Where(x => x.Name.Contains(kw) || x.Description.Contains(kw));
+        }
+
+        query = ApplySorting(query, sortBy, sortDirection);
+
+        var totalCount = await query.CountAsync(ct).ConfigureAwait(false);
+
+        page = Math.Max(page, 1);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        return (items, totalCount);
+    }
+
     public async Task<(IReadOnlyList<FileDocument> Items, int TotalCount)> SearchAsync(
         Guid? projectId,
         string? keyword,
@@ -70,6 +112,22 @@ public class FileDocumentRepository : IFileDocumentRepository
         _db.FileDocuments.Update(document);
         return Task.CompletedTask;
     }
+
+    public Task HardRemoveAsync(FileDocument document, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        // Bypass the global soft-delete filter so EF can actually remove the row.
+        _db.FileDocuments.IgnoreQueryFilters();
+        _db.FileDocuments.Remove(document);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> CountOtherReferencesByStorageKeyAsync(
+        string storageKey, Guid excludeId, CancellationToken ct = default)
+        => _db.FileDocuments
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .CountAsync(x => x.StorageKey == storageKey && x.Id != excludeId, ct);
 
     private static IQueryable<FileDocument> ApplySorting(
         IQueryable<FileDocument> query, string? sortBy, string? sortDirection)

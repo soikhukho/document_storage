@@ -23,7 +23,24 @@ public class CreateProjectCommandHandler
     public async Task<Result<ProjectDto>> HandleAsync(
         CreateProjectCommand command, CancellationToken ct = default)
     {
-        var project = Project.Create(command.Name, command.Description);
+        Project project;
+        try
+        {
+            project = Project.Create(command.Name, command.FolderName, command.Description);
+        }
+        catch (ArgumentException ex)
+        {
+            return Result<ProjectDto>.Failure(
+                AppError.Validation("INVALID_PROJECT", ex.Message));
+        }
+
+        if (await _repository.ExistsByFolderNameAsync(project.FolderName, excludeId: null, ct).ConfigureAwait(false))
+        {
+            return Result<ProjectDto>.Failure(
+                AppError.Conflict(
+                    "FOLDER_NAME_EXISTS",
+                    $"Folder name '{project.FolderName}' is already used by another project."));
+        }
 
         await _repository.AddAsync(project, ct).ConfigureAwait(false);
         await _unitOfWork.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -34,6 +51,7 @@ public class CreateProjectCommandHandler
     internal static ProjectDto MapToDto(Project project) => new(
         project.Id,
         project.Name,
+        project.FolderName,
         project.Description,
         project.ApiKey,
         project.IsActive,

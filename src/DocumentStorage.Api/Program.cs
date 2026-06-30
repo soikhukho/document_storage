@@ -23,10 +23,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddScoped<ICommandHandler<InitUploadCommand, InitUploadResponse>, InitUploadCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<CompleteUploadCommand, FileDto>, CompleteUploadCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<DeleteFileCommand>, DeleteFileCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<RestoreFileCommand>, RestoreFileCommandHandler>();
+builder.Services.AddScoped<ICommandHandler<PurgeFileCommand>, PurgeFileCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<UpdateDescriptionCommand, FileDto>, UpdateDescriptionCommandHandler>();
 builder.Services.AddScoped<IQueryHandler<GetFileByIdQuery, FileDto>, GetFileByIdQueryHandler>();
 builder.Services.AddScoped<IQueryHandler<SearchFilesQuery, PagedResult<FileDto>>, SearchFilesQueryHandler>();
 builder.Services.AddScoped<IQueryHandler<GetFilesByUserQuery, PagedResult<FileDto>>, GetFilesByUserQueryHandler>();
+builder.Services.AddScoped<IQueryHandler<GetTrashQuery, PagedResult<FileDto>>, GetTrashQueryHandler>();
 
 // ── Project CQRS handlers ──
 builder.Services.AddScoped<ICommandHandler<CreateProjectCommand, ProjectDto>, CreateProjectCommandHandler>();

@@ -8,7 +8,6 @@ namespace DocumentStorage.Application.Tests.Commands;
 
 public class DeleteFileCommandHandlerTests
 {
-    private readonly IStorageProvider _storage = Substitute.For<IStorageProvider>();
     private readonly IFileDocumentRepository _repo = Substitute.For<IFileDocumentRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly DeleteFileCommandHandler _handler;
@@ -19,11 +18,11 @@ public class DeleteFileCommandHandlerTests
 
     public DeleteFileCommandHandlerTests()
     {
-        _handler = new DeleteFileCommandHandler(_storage, _repo, _uow);
+        _handler = new DeleteFileCommandHandler(_repo, _uow);
     }
 
     [Fact]
-    public async Task HandleAsync_FileExists_DeletesFromStorageAndSoftDeletesRecord()
+    public async Task HandleAsync_FileExists_SoftDeletesRecordButKeepsStorageObject()
     {
         var document = FileDocument.Create(
             ProjectId, "doc.pdf", "pdf", "application/pdf", 1024,
@@ -33,7 +32,6 @@ public class DeleteFileCommandHandlerTests
         var result = await _handler.HandleAsync(new DeleteFileCommand(ProjectId, FileId, UserId));
 
         Assert.True(result.IsSuccess);
-        await _storage.Received(1).DeleteAsync(document.StorageKey, Arg.Any<CancellationToken>());
         Assert.True(document.IsDeleted);
         Assert.NotNull(document.DeletedAt);
         await _repo.Received(1).UpdateAsync(document, Arg.Any<CancellationToken>());
@@ -41,7 +39,7 @@ public class DeleteFileCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_FileNotFound_ReturnsFailureAndDoesNotDeleteFromStorage()
+    public async Task HandleAsync_FileNotFound_ReturnsFailureAndDoesNotCommit()
     {
         _repo.GetByIdAndUserAsync(FileId, ProjectId, UserId, Arg.Any<CancellationToken>())
             .Returns((FileDocument?)null);
@@ -50,7 +48,6 @@ public class DeleteFileCommandHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
-        await _storage.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -64,6 +61,5 @@ public class DeleteFileCommandHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
-        await _storage.DidNotReceive().DeleteAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 }

@@ -47,4 +47,12 @@ public class ProjectRepository : IProjectRepository
         _db.Projects.Update(project);
         return Task.CompletedTask;
     }
+
+    public Task<bool> ExistsByFolderNameAsync(string folderName, Guid? excludeId = null, CancellationToken ct = default)
+    {
+        var query = _db.Projects.AsNoTracking().Where(x => x.FolderName == folderName);
+        if (excludeId.HasValue)
+            query = query.Where(x => x.Id != excludeId.Value);
+        return query.AnyAsync(ct);
+    }
 }

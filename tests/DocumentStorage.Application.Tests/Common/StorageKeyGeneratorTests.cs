@@ -4,51 +4,51 @@ namespace DocumentStorage.Application.Tests.Common;
 
 public class StorageKeyGeneratorTests
 {
-    private static readonly Guid ProjectId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid UserId = Guid.Parse("aaaabbbb-cccc-dddd-eeee-ffff00001111");
-    private static readonly Guid FileId = Guid.Parse("11112222-3333-4444-5555-666677778888");
-
     [Fact]
-    public void Generate_ReturnsExpectedFormat()
+    public void Generate_ReturnsProjectSlashFileFormat()
     {
-        var now = DateTime.UtcNow;
+        var key = StorageKeyGenerator.Generate("Test Project", "report.pdf");
 
-        var key = StorageKeyGenerator.Generate(ProjectId, UserId, FileId, "pdf");
-
-        var expected = $"projects/{ProjectId}/users/{UserId}/{now:yyyy}/{now:MM}/{FileId}.pdf";
-        Assert.Equal(expected, key);
+        Assert.Equal("Test Project/report.pdf", key);
     }
 
     [Fact]
-    public void Generate_StripsLeadingDotFromExtension()
+    public void Generate_PreservesVietnameseAndSpaces()
     {
-        var key = StorageKeyGenerator.Generate(ProjectId, UserId, FileId, ".PDF");
+        var key = StorageKeyGenerator.Generate("Sky Lake Mỹ Đình", "tài liệu.pdf");
 
-        Assert.EndsWith(".pdf", key);
-        Assert.DoesNotContain("..pdf", key);
+        Assert.Equal("Sky Lake Mỹ Đình/tài liệu.pdf", key);
     }
 
     [Fact]
-    public void Generate_AlwaysContainsProjectId()
+    public void Generate_ReplacesSlashInProjectName()
     {
-        var key = StorageKeyGenerator.Generate(ProjectId, UserId, FileId, "pdf");
+        var key = StorageKeyGenerator.Generate("a/b\\c", "file.pdf");
 
-        Assert.Contains($"projects/{ProjectId}/", key);
+        Assert.Equal("a_b_c/file.pdf", key);
     }
 
     [Fact]
-    public void Generate_AlwaysContainsUserId()
+    public void Generate_ReplacesSlashInFileName()
     {
-        var key = StorageKeyGenerator.Generate(ProjectId, UserId, FileId, "pdf");
+        var key = StorageKeyGenerator.Generate("Proj", "sub/dir/file.pdf");
 
-        Assert.Contains(UserId.ToString(), key);
+        Assert.Equal("Proj/sub_dir_file.pdf", key);
     }
 
     [Fact]
-    public void Generate_AlwaysContainsFileId()
+    public void Generate_FallsBackToUnderscore_WhenProjectNameEmpty()
     {
-        var key = StorageKeyGenerator.Generate(ProjectId, UserId, FileId, "pdf");
+        var key = StorageKeyGenerator.Generate("   ", "file.pdf");
 
-        Assert.Contains(FileId.ToString(), key);
+        Assert.Equal("_/file.pdf", key);
+    }
+
+    [Fact]
+    public void Generate_FallsBackToUnderscore_WhenFileNameEmpty()
+    {
+        var key = StorageKeyGenerator.Generate("Proj", "");
+
+        Assert.Equal("Proj/_", key);
     }
 }

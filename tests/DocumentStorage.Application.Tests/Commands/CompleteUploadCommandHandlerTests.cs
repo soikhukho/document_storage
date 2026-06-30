@@ -1,6 +1,7 @@
 using DocumentStorage.Application.Commands;
 using DocumentStorage.Application.DTOs;
 using DocumentStorage.Application.Interfaces;
+using DocumentStorage.Domain.Entities;
 using DocumentStorage.Domain.Enums;
 using NSubstitute;
 
@@ -10,6 +11,7 @@ public class CompleteUploadCommandHandlerTests
 {
     private readonly IStorageProvider _storage = Substitute.For<IStorageProvider>();
     private readonly IFileDocumentRepository _repo = Substitute.For<IFileDocumentRepository>();
+    private readonly IProjectRepository _projectRepo = Substitute.For<IProjectRepository>();
     private readonly IUnitOfWork _uow = Substitute.For<IUnitOfWork>();
     private readonly StorageOptions _options = new();
     private readonly CompleteUploadCommandHandler _handler;
@@ -20,7 +22,9 @@ public class CompleteUploadCommandHandlerTests
 
     public CompleteUploadCommandHandlerTests()
     {
-        _handler = new CompleteUploadCommandHandler(_storage, _repo, _uow, _options);
+        _projectRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Project.Create("Test Project", "test-project"));
+        _handler = new CompleteUploadCommandHandler(_storage, _repo, _projectRepo, _uow, _options);
     }
 
     [Fact]
@@ -43,7 +47,7 @@ public class CompleteUploadCommandHandlerTests
         Assert.Equal("desc", result.Value.Description);
         Assert.Equal("https://download/url", result.Value.DownloadUrl);
 
-        await _repo.Received(1).AddAsync(Arg.Is<Domain.Entities.FileDocument>(d =>
+        await _repo.Received(1).AddAsync(Arg.Is<FileDocument>(d =>
             d.UploadedBy == UserId && d.ProjectId == ProjectId), Arg.Any<CancellationToken>());
         await _uow.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -59,7 +63,7 @@ public class CompleteUploadCommandHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("FILE_NOT_FOUND", result.FirstError!.Code);
-        await _repo.DidNotReceive().AddAsync(Arg.Any<Domain.Entities.FileDocument>(), Arg.Any<CancellationToken>());
+        await _repo.DidNotReceive().AddAsync(Arg.Any<FileDocument>(), Arg.Any<CancellationToken>());
         await _uow.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -76,6 +80,20 @@ public class CompleteUploadCommandHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_ProjectNotFound_ReturnsNotFound()
+    {
+        _projectRepo.GetByIdAsync(ProjectId, Arg.Any<CancellationToken>())
+            .Returns((Project?)null);
+
+        var command = new CompleteUploadCommand(ProjectId, FileId, "doc.pdf", "application/pdf", 1024, UserId);
+
+        var result = await _handler.HandleAsync(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("PROJECT_NOT_FOUND", result.FirstError!.Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_UsesConfiguredProviderType()
     {
         _options.Provider = StorageProviderType.S3;
@@ -87,7 +105,7 @@ public class CompleteUploadCommandHandlerTests
 
         await _handler.HandleAsync(command);
 
-        await _repo.Received(1).AddAsync(Arg.Is<Domain.Entities.FileDocument>(d =>
+        await _repo.Received(1).AddAsync(Arg.Is<FileDocument>(d =>
             d.Provider == StorageProviderType.S3), Arg.Any<CancellationToken>());
     }
 }

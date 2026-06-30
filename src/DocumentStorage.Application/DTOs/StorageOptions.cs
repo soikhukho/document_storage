@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using DocumentStorage.Domain.Enums;
 
 namespace DocumentStorage.Application.DTOs;
@@ -9,6 +10,7 @@ public class StorageOptions
 {
     public const string SectionName = "Storage";
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public StorageProviderType Provider { get; set; } = StorageProviderType.Local;
 
     /// <summary>

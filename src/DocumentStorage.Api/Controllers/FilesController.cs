@@ -145,6 +145,65 @@ public class FilesController : ControllerBase
     }
 
     /// <summary>
+    /// List files in the project's trash bin (soft-deleted files).
+    /// </summary>
+    [HttpGet("trash")]
+    public async Task<IActionResult> GetTrash(
+        [FromServices] IQueryHandler<GetTrashQuery, PagedResult<FileDto>> handler,
+        CancellationToken ct,
+        [FromQuery] string? keyword = null,
+        [FromQuery, Range(1, int.MaxValue)] int page = 1,
+        [FromQuery, Range(1, 100)] int pageSize = 20,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDirection = "asc")
+    {
+        var projectId = GetScopedProjectId()
+            ?? throw new UnauthorizedAccessException("Admin must specify a project via the 'projectId' query parameter.");
+
+        var query = new GetTrashQuery(
+            projectId, null, keyword, page, pageSize, sortBy, sortDirection);
+
+        var result = await handler.HandleAsync(query, ct);
+        return this.ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Restore a soft-deleted file from the trash bin.
+    /// </summary>
+    [HttpPost("{id:guid}/restore")]
+    public async Task<IActionResult> Restore(
+        Guid id,
+        [FromServices] ICommandHandler<RestoreFileCommand> handler,
+        CancellationToken ct,
+        [FromQuery] Guid? projectId = null)
+    {
+        var pid = ResolveProjectId(projectId);
+        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
+
+        var command = new RestoreFileCommand(pid, id, userId);
+        var result = await handler.HandleAsync(command, ct);
+        return this.ToActionResult(result);
+    }
+
+    /// <summary>
+    /// Permanently remove a file from trash: deletes the S3 object and the DB row.
+    /// </summary>
+    [HttpDelete("{id:guid}/purge")]
+    public async Task<IActionResult> Purge(
+        Guid id,
+        [FromServices] ICommandHandler<PurgeFileCommand> handler,
+        CancellationToken ct,
+        [FromQuery] Guid? projectId = null)
+    {
+        var pid = ResolveProjectId(projectId);
+        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
+
+        var command = new PurgeFileCommand(pid, id, userId);
+        var result = await handler.HandleAsync(command, ct);
+        return this.ToActionResult(result, successStatus: 204);
+    }
+
+    /// <summary>
     /// Search files with keyword, pagination, and sorting.
     /// </summary>
     [HttpGet]

@@ -4,12 +4,15 @@ using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Entities;
 using DocumentStorage.Domain.Enums;
 using NSubstitute;
+using AppError = DocumentStorage.Shared.Results.AppError;
 
 namespace DocumentStorage.Application.Tests.Commands;
 
 public class InitUploadCommandHandlerTests
 {
     private readonly IStorageProvider _storage = Substitute.For<IStorageProvider>();
+    private readonly IFileDocumentRepository _fileRepo = Substitute.For<IFileDocumentRepository>();
+    private readonly IProjectRepository _projectRepo = Substitute.For<IProjectRepository>();
     private readonly StorageOptions _options = new();
     private readonly InitUploadCommandHandler _handler;
 
@@ -18,7 +21,11 @@ public class InitUploadCommandHandlerTests
 
     public InitUploadCommandHandlerTests()
     {
-        _handler = new InitUploadCommandHandler(_storage, _options);
+        _fileRepo.ExistsByNameAsync(Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _projectRepo.GetByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+            .Returns(Project.Create("Test Project", "test-project"));
+        _handler = new InitUploadCommandHandler(_storage, _fileRepo, _projectRepo, _options);
     }
 
     [Fact]
@@ -45,7 +52,7 @@ public class InitUploadCommandHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_ValidFile_CallsStorageProviderWithGeneratedKey()
+    public async Task HandleAsync_ValidFile_CallsStorageProviderWithFlatKey()
     {
         _storage.InitUploadAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<long>(),
             Arg.Any<int>(), Arg.Any<CancellationToken>())
@@ -56,11 +63,42 @@ public class InitUploadCommandHandlerTests
         await _handler.HandleAsync(command);
 
         await _storage.Received(1).InitUploadAsync(
-            Arg.Is<string>(key => key.StartsWith($"projects/{ProjectId}/users/{UserId}/")),
+            Arg.Is<string>(key => key == "test-project/doc.pdf"),
             "application/pdf",
             1024,
             _options.UploadExpirationMinutes,
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_DuplicateFileName_ReturnsConflictBeforeCallingStorage()
+    {
+        _fileRepo.ExistsByNameAsync(ProjectId, "doc.pdf", Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var command = new InitUploadCommand(ProjectId, "doc.pdf", "application/pdf", 1024, UserId);
+
+        var result = await _handler.HandleAsync(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("FILE_NAME_EXISTS", result.FirstError!.Code);
+        await _storage.DidNotReceive().InitUploadAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<long>(),
+            Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_ProjectNotFound_ReturnsNotFound()
+    {
+        _projectRepo.GetByIdAsync(ProjectId, Arg.Any<CancellationToken>())
+            .Returns((Project?)null);
+
+        var command = new InitUploadCommand(ProjectId, "doc.pdf", "application/pdf", 1024, UserId);
+
+        var result = await _handler.HandleAsync(command);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("PROJECT_NOT_FOUND", result.FirstError!.Code);
     }
 
     [Fact]
