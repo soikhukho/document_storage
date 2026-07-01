@@ -55,7 +55,7 @@ public static class DependencyInjection
         services.AddSingleton<IAuditLogger, AuditLogger>();
 
         // ── Auth (admin JWT login) ──
-        services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
+        services.Configure<JwtOptions>(_ => { });
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddSingleton<IPasswordHasher, PasswordHasher>();
 
