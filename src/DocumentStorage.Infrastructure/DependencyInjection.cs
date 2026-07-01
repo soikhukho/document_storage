@@ -4,6 +4,7 @@ using DocumentStorage.Application.Interfaces;
 using DocumentStorage.Domain.Enums;
 using DocumentStorage.Infrastructure.Auth;
 using DocumentStorage.Infrastructure.Caching;
+using DocumentStorage.Infrastructure.Logging;
 using DocumentStorage.Infrastructure.Persistence;
 using DocumentStorage.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
@@ -47,7 +48,11 @@ public static class DependencyInjection
         services.AddScoped<IFileDocumentRepository, FileDocumentRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+        // ── Audit logging (uses its own scope per entry) ──
+        services.AddSingleton<IAuditLogger, AuditLogger>();
 
         // ── Auth (admin JWT login) ──
         services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));

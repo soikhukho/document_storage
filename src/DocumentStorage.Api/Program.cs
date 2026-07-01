@@ -1,3 +1,4 @@
+using DocumentStorage.Api.Filters;
 using DocumentStorage.Api.Middleware;
 using DocumentStorage.Application.AuthCommands;
 using DocumentStorage.Application.Commands;
@@ -9,11 +10,22 @@ using DocumentStorage.Application.Queries;
 using DocumentStorage.Infrastructure;
 using DocumentStorage.Infrastructure.Auth;
 using Scalar.AspNetCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// ── Serilog (console + rolling file) ──
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+builder.Host.UseSerilog();
+
 // ── Framework services ──
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<AuditLogActionFilter>();
+});
+builder.Services.AddScoped<AuditLogActionFilter>();
 builder.Services.AddOpenApi();
 
 // ── Infrastructure (DbContext, repositories, storage providers, auth) ──
@@ -45,6 +57,7 @@ builder.Services.AddScoped<ICommandHandler<LoginCommand, LoginResult>, LoginComm
 var app = builder.Build();
 
 // ── Pipeline ──
+app.UseSerilogRequestLogging();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 app.UseMiddleware<JwtAuthenticationMiddleware>();
 app.UseMiddleware<ProjectResolutionMiddleware>();
@@ -57,4 +70,15 @@ app.MapControllers();
 // ── Bootstrap admin user (idempotent) ──
 await AdminUserSeeder.SeedAsync(app.Services);
 
-app.Run();
+try
+{
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly.");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
