@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc.Filters;
 namespace DocumentStorage.Api.Attributes;
 
 /// <summary>
-/// Requires the caller to be an admin (X-API-Key matches AdminKey).
+/// Requires the caller to be an admin (valid JWT from <c>/api/auth/login</c>).
 /// Returns 403 Forbidden otherwise.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
