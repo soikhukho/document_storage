@@ -6,5 +6,8 @@ namespace DocumentStorage.Application;
 /// </summary>
 public static class HttpContextItemsKeys
 {
+    public const string IsAdmin = "IsAdmin";
     public const string ProjectId = "ProjectId";
+    public const string AdminUserId = "AdminUserId";
+    public const string AdminUsername = "AdminUsername";
 }

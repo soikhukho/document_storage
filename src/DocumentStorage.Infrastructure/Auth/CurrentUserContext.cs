@@ -1,10 +1,13 @@
+using System.Security.Claims;
+using DocumentStorage.Application;
 using DocumentStorage.Application.Interfaces;
 using Microsoft.AspNetCore.Http;
 
 namespace DocumentStorage.Infrastructure.Auth;
 
 /// <summary>
-/// Resolves the current user from the <c>X-User-Id</c> header.
+/// Resolves the current user from headers.
+/// In production, replace with JWT claims or proper auth middleware.
 /// </summary>
 public class CurrentUserContext : ICurrentUserContext
 {
@@ -32,4 +35,28 @@ public class CurrentUserContext : ICurrentUserContext
     }
 
     public bool IsAuthenticated => UserId != Guid.Empty;
+
+    public bool IsAdmin =>
+        _accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.IsAdmin, out var val) == true
+        && val is true;
+
+    /// <summary>
+    /// Resolved admin user id (set by JWT middleware) or Guid.Empty when
+    /// the caller is a project-scoped API key or anonymous.
+    /// </summary>
+    public Guid AdminUserId
+    {
+        get
+        {
+            if (_accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.AdminUserId, out var val) == true
+                && val is Guid id)
+                return id;
+            return Guid.Empty;
+        }
+    }
+
+    public string? AdminUsername
+        => _accessor.HttpContext?.Items.TryGetValue(HttpContextItemsKeys.AdminUsername, out var val) == true
+            ? val as string
+            : null;
 }

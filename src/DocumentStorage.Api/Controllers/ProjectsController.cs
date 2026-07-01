@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DocumentStorage.Api.Attributes;
 using DocumentStorage.Api.Extensions;
 using DocumentStorage.Api.Models;
 using DocumentStorage.Application.DTOs;
@@ -16,17 +17,26 @@ namespace DocumentStorage.Api.Controllers;
 [Route("api/projects")]
 public class ProjectsController : ControllerBase
 {
+    private readonly ICurrentUserContext _currentUser;
     private readonly ICurrentProjectContext _currentProject;
 
-    public ProjectsController(ICurrentProjectContext currentProject)
+    public ProjectsController(
+        ICurrentUserContext currentUser,
+        ICurrentProjectContext currentProject)
     {
+        _currentUser = currentUser;
         _currentProject = currentProject;
     }
 
+    private bool IsAdmin => _currentUser.IsAdmin;
+
+    // ── Admin-only endpoints ──
+
     /// <summary>
-    /// Create a new project. Returns project info with API key.
+    /// Create a new project. Returns project info with API key. [Admin]
     /// </summary>
     [HttpPost]
+    [AdminOnly]
     public async Task<IActionResult> Create(
         [FromBody] CreateProjectRequest request,
         [FromServices] ICommandHandler<CreateProjectCommand, ProjectDto> handler,
@@ -38,9 +48,10 @@ public class ProjectsController : ControllerBase
     }
 
     /// <summary>
-    /// List all projects (paged).
+    /// List all projects (paged). [Admin]
     /// </summary>
     [HttpGet]
+    [AdminOnly]
     public async Task<IActionResult> GetAll(
         [FromServices] IQueryHandler<GetAllProjectsQuery, PagedResult<ProjectDto>> handler,
         CancellationToken ct,
@@ -53,31 +64,10 @@ public class ProjectsController : ControllerBase
     }
 
     /// <summary>
-    /// Get a project by id.
-    /// </summary>
-    [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(
-        Guid id,
-        [FromServices] IQueryHandler<GetProjectByIdQuery, ProjectDto> handler,
-        CancellationToken ct)
-    {
-        if (_currentProject.IsAvailable && id != _currentProject.ProjectId)
-            return StatusCode(403, ApiResponse.Fail("You can only access your own project."));
-
-        var query = new GetProjectByIdQuery(id);
-        var result = await handler.HandleAsync(query, ct);
-
-        // Project clients don't see the API key
-        if (result.IsSuccess && _currentProject.IsAvailable)
-            return this.ToActionResult(Result<ProjectDto>.Success(result.Value! with { ApiKey = "" }));
-
-        return this.ToActionResult(result);
-    }
-
-    /// <summary>
-    /// Update project name and/or description.
+    /// Update project name and/or description. [Admin]
     /// </summary>
     [HttpPut("{id:guid}")]
+    [AdminOnly]
     public async Task<IActionResult> Update(
         Guid id,
         [FromBody] UpdateProjectRequest request,
@@ -90,9 +80,10 @@ public class ProjectsController : ControllerBase
     }
 
     /// <summary>
-    /// Activate or deactivate a project.
+    /// Activate or deactivate a project. [Admin]
     /// </summary>
     [HttpPatch("{id:guid}/active")]
+    [AdminOnly]
     public async Task<IActionResult> SetActive(
         Guid id,
         [FromBody] bool isActive,
@@ -105,9 +96,10 @@ public class ProjectsController : ControllerBase
     }
 
     /// <summary>
-    /// Regenerate the API key for a project.
+    /// Regenerate the API key for a project. [Admin]
     /// </summary>
     [HttpPost("{id:guid}/regenerate-key")]
+    [AdminOnly]
     public async Task<IActionResult> RegenerateApiKey(
         Guid id,
         [FromServices] ICommandHandler<RegenerateApiKeyCommand, ProjectDto> handler,
@@ -115,6 +107,29 @@ public class ProjectsController : ControllerBase
     {
         var command = new RegenerateApiKeyCommand(id);
         var result = await handler.HandleAsync(command, ct);
+        return this.ToActionResult(result);
+    }
+
+    // ── Mixed access endpoints ──
+
+    /// <summary>
+    /// Get a project by id.
+    /// </summary>
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetById(
+        Guid id,
+        [FromServices] IQueryHandler<GetProjectByIdQuery, ProjectDto> handler,
+        CancellationToken ct)
+    {
+        if (!IsAdmin && id != _currentProject.ProjectId)
+            return StatusCode(403, ApiResponse.Fail("You can only access your own project."));
+
+        var query = new GetProjectByIdQuery(id);
+        var result = await handler.HandleAsync(query, ct);
+
+        if (result.IsSuccess && !IsAdmin)
+            return this.ToActionResult(Result<ProjectDto>.Success(result.Value! with { ApiKey = "" }));
+
         return this.ToActionResult(result);
     }
 
@@ -132,7 +147,7 @@ public class ProjectsController : ControllerBase
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc")
     {
-        if (_currentProject.IsAvailable && id != _currentProject.ProjectId)
+        if (!IsAdmin && id != _currentProject.ProjectId)
             return StatusCode(403, ApiResponse.Fail("You can only access your own project."));
 
         var query = new SearchFilesQuery(

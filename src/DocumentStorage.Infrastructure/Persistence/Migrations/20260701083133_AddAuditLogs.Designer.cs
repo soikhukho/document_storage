@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace DocumentStorage.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(DocumentStorageDbContext))]
-    [Migration("20260701022109_AddAuditLogs")]
+    [Migration("20260701083133_AddAuditLogs")]
     partial class AddAuditLogs
     {
         /// <inheritdoc />

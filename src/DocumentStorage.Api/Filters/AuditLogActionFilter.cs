@@ -92,6 +92,16 @@ public sealed class AuditLogActionFilter : IAsyncActionFilter
 
     private static (AuditActorType actorType, string? actorId, Guid? projectId) ResolveActor(HttpContext http)
     {
+        var isAdmin = http.Items.TryGetValue(HttpContextItemsKeys.IsAdmin, out var adminVal)
+                      && adminVal is true;
+
+        if (isAdmin)
+        {
+            var adminId = http.Items.TryGetValue(HttpContextItemsKeys.AdminUserId, out var idVal)
+                          && idVal is Guid g ? g.ToString() : null;
+            return (AuditActorType.Admin, adminId, null);
+        }
+
         if (http.Items.TryGetValue(HttpContextItemsKeys.ProjectId, out var pidVal)
             && pidVal is Guid projectId)
         {
