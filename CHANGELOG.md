@@ -6,6 +6,23 @@ Tất cả thay đổi đáng chú ý của dự án DocumentStorageService.
 
 ---
 
+## [0.4.0] — 2026-07-01
+
+### Added
+- **Serilog** integration (`Serilog.AspNetCore` 8.x) với console + rolling file sink (daily rotation, giữ 30 ngày)
+- **Request logging** middleware (`UseSerilogRequestLogging`) — tự động log mỗi HTTP request: method, path, status, duration
+- **Audit log** — ghi lại mọi mutating operation (POST/PUT/PATCH/DELETE) vào DB
+  - `AuditLog` entity (Domain) với `AuditActorType` enum (Admin, Project, Anonymous)
+  - `AuditLogActionFilter` (global action filter) — tự động kích hoạt, đọc actor info từ HttpContext.Items
+  - `AuditLogger` (Infrastructure) — persist entry qua DI scope riêng, độc lập request transaction
+  - `IAuditLogger` dùng `AuditLogEntry` record (Application DTO) tránh parameter sprawl
+  - `Success` auto-derived từ `StatusCode < 400`
+  - EF migration `AddAuditLogs` — bảng AuditLogs với indexes trên Timestamp, ProjectId, ActorType
+- `logs/` thêm vào `.gitignore`
+- Shutdown an toàn: `try/catch/finally` với `Log.CloseAndFlush()` đảm bảo không mất log khi crash
+
+---
+
 ## [0.3.0] — 2026-06-24
 
 ### Changed

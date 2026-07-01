@@ -9,7 +9,8 @@
 5. [API Reference](#5-api-reference)
 6. [Ví dụ tích hợp (Client)](#6-ví-dụ-tích-hợp-client)
 7. [Bảo mật](#7-bảo-mật)
-8. [Xử lý sự cố](#8-xử-lý-sự-cố)
+8. [Logging](#8-logging)
+9. [Xử lý sự cố](#9-xử-lý-sự-cố)
 
 ---
 
@@ -164,9 +165,11 @@ dotnet ef database update \
   --startup-project src/DocumentStorage.Api
 ```
 
-Database sẽ có 2 bảng:
+Database sẽ có 4 bảng:
 - **Projects** — thông tin project + API key
 - **FileDocuments** — metadata file (scoped theo ProjectId)
+- **AdminUsers** — tài khoản admin (JWT login)
+- **AuditLogs** — audit trail cho mutating operations
 
 ### 3.3. Chạy ứng dụng
 
@@ -554,10 +557,121 @@ const { data: fileDto } = await completeRes.json();
 - Cấu hình `MaxUploadSizeBytes` phù hợp
 - Backup database định kỳ
 - Monitor storage disk (nếu dùng Local)
+- **Giám sát log**: Theo dõi file log trong `logs/` và bảng `AuditLogs` để phát hiện bất thường
+- Đảm bảo thư mục `logs/` có quyền ghi khi deploy
 
 ---
 
-## 8. Xử lý sự cố
+## 8. Logging
+
+Hệ thống có 3 cơ chế logging: **structured logging** (console + file), **request logging**, và **audit log** (database).
+
+### 8.1. Serilog — Console & File
+
+Cấu hình trong `appsettings.json`:
+
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "outputTemplate": "[{Timestamp:HH:mm:ss} {Level:u3}] {SourceContext}: {Message:lj}{NewLine}{Exception}"
+        }
+      },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/document-storage-.log",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 30,
+          "outputTemplate": "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}"
+        }
+      }
+    ]
+  }
+}
+```
+
+| Setting | Mặc định | Mô tả |
+|---|---|---|
+| `MinimumLevel:Default` | `Information` | Log level tối thiểu |
+| `MinimumLevel:Override` | — | Giảm noise từ ASP.NET Core / EF Core xuống Warning |
+| `path` | `logs/document-storage-.log` | Đường dẫn file log (thư mục `logs/` tự tạo) |
+| `rollingInterval` | `Day` | Rotation theo ngày (file: `document-storage-20260701.log`) |
+| `retainedFileCountLimit` | `30` | Giữ tối đa 30 file log gần nhất |
+
+> **Production:** Đảm bảo thư mục `logs/` có quyền ghi. Nếu chạy Docker, mount volume cho `logs/`.
+
+### 8.2. Request Logging
+
+Middleware `UseSerilogRequestLogging()` tự động log mỗi HTTP request:
+
+```
+[09:15:32 INF] HTTP POST /api/files/complete responded 201 in 45.234 ms
+```
+
+Chạy đầu pipeline, áp dụng cho **mọi** request (kể cả GET, HEAD, OPTIONS).
+
+### 8.3. Audit Log (Database)
+
+Mọi mutating operation (POST, PUT, PATCH, DELETE) được ghi vào bảng `AuditLogs` tự động bởi `AuditLogActionFilter`.
+
+**Dữ liệu ghi lại:**
+
+| Field | Mô tả |
+|---|---|
+| `Timestamp` | Thời điểm (UTC) |
+| `HttpMethod` | POST / PUT / PATCH / DELETE |
+| `Path` | Request path |
+| `Action` | `{Controller}.{Action}` (vd: `Files.Delete`) |
+| `StatusCode` | HTTP response status code |
+| `Success` | `true` nếu StatusCode < 400 |
+| `ActorType` | `Admin` / `Project` / `Anonymous` |
+| `ActorId` | AdminUserId hoặc ProjectId |
+| `ProjectId` | Project context (nếu có) |
+| `EntityId` | Route `id` parameter |
+| `IPAddress` | Remote IP |
+| `UserAgent` | User-Agent header |
+
+**Truy vấn audit log:**
+
+```sql
+-- 50 thao tác gần nhất
+SELECT TOP 50 * FROM AuditLogs ORDER BY Timestamp DESC;
+
+-- Theo project
+SELECT * FROM AuditLogs WHERE ProjectId = 'a1b2c3d4-...' ORDER BY Timestamp DESC;
+
+-- Thao tác thất bại
+SELECT * FROM AuditLogs WHERE Success = 0 ORDER BY Timestamp DESC;
+
+-- Theo loại actor
+SELECT * FROM AuditLogs WHERE ActorType = 0;  -- Admin
+```
+
+> **Lưu ý:** Audit log write xảy ra đồng bộ trên request path. Nếu DB không khả dụng, audit write fail nhưng request vẫn thành công (error được swallow và log ra Serilog).
+
+### 8.4. Thay đổi Log Level
+
+Đổi level không cần sửa code — chỉ cần cập nhật `appsettings.json` hoặc dùng environment variables:
+
+```bash
+# Bật debug logging qua env var
+export Serilog__MinimumLevel__Default="Debug"
+```
+
+---
+
+## 9. Xử lý sự cố
 
 ### Lỗi 401 Unauthorized
 
@@ -595,4 +709,24 @@ const { data: fileDto } = await completeRes.json();
    1. Tạo database thủ công
    2. Kiểm tra connection string
    3. Chạy: dotnet ef database update
+```
+
+### Không thấy file log
+
+```
+ Nguyên nhân: Thư mục logs/ không có quyền ghi, hoặc đường dẫn sai
+ Khắc phục:
+   1. Kiểm tra cấu hình Serilog:WriteTo → File → path trong appsettings.json
+   2. Đảm bảo thư mục logs/ tồn tại và có quyền ghi
+   3. Nếu chạy Docker, mount volume: -v ./logs:/app/logs
+```
+
+### Bảng AuditLogs trống
+
+```
+ Nguyên nhân: Chưa chạy migration AddAuditLogs, hoặc chưa có mutating request
+ Khắc phục:
+   1. Chạy: dotnet ef database update (đảm bảo migration mới nhất)
+   2. Thực hiện POST/PUT/PATCH/DELETE request — GET không được audit
+   3. Kiểm tra Serilog console log xem có lỗi "Failed to persist audit log" không
 ```

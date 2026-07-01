@@ -13,6 +13,9 @@ Dịch vụ lưu trữ tài liệu đa tenant, xây dựng trên ASP.NET Core 9 
 - **Phân quyền**: Admin (JWT, toàn quyền) và Project User (API key `pk_...`, scoped theo project)
 - **Tìm kiếm & phân trang**: Keyword, sort, paging trên metadata
 - **Response chuẩn**: Mọi API response bọc trong `ApiResponse<T>` envelope (`success`, `data`, `message`, `errors`, `timestamp`)
+- **Logging**: Serilog với console + rolling file sink (daily rotation, 30-day retention)
+- **Request logging**: Tự động log mỗi HTTP request (method, path, status, duration)
+- **Audit log**: Ghi lại mọi mutating operation (POST/PUT/PATCH/DELETE) vào DB với actor info, IP, status code
 
 ## Kiến trúc
 
@@ -104,6 +107,7 @@ Xem chi tiết tại [DEPLOYMENT-GUIDE.md](DEPLOYMENT-GUIDE.md).
 | .NET | 9.0 |
 | EF Core | 9.0 |
 | AWSSDK.S3 | 3.7.* |
+| Serilog | 8.0.* (Serilog.AspNetCore) |
 | Database | SQL Server hoặc PostgreSQL |
 | Testing | xUnit + NSubstitute |
 

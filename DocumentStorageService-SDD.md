@@ -185,6 +185,40 @@ CreatedAt : DateTime
 
 UpdatedAt : DateTime?
 
+## AuditLog
+
+Represents an immutable audit trail entry for mutating API operations (POST/PUT/PATCH/DELETE).
+
+Properties:
+
+Id : Guid
+
+Timestamp : DateTime
+
+HttpMethod : string
+
+Path : string
+
+Action : string (format: `{Controller}.{Action}`)
+
+StatusCode : int
+
+Success : bool (auto-derived: `StatusCode < 400`)
+
+ActorType : AuditActorType
+
+ActorId : string? (AdminUserId or ProjectId as string)
+
+ProjectId : Guid?
+
+EntityId : string? (route id parameter)
+
+IPAddress : string?
+
+UserAgent : string?
+
+Details : string? (reserved for future use)
+
 ---
 
 # 5. Enum
@@ -198,6 +232,16 @@ S3 = 1
 MinIO = 2
 
 Local = 3
+
+AuditActorType
+
+Values:
+
+Admin = 0
+
+Project = 1
+
+Anonymous = 2
 
 ---
 
@@ -510,6 +554,46 @@ CreatedAt TIMESTAMP
 
 UpdatedAt TIMESTAMP NULL
 
+## AuditLogs
+
+Columns:
+
+Id UUID PK
+
+Timestamp DATETIME
+
+HttpMethod VARCHAR(10)
+
+Path VARCHAR(500)
+
+Action VARCHAR(200)
+
+StatusCode INT
+
+Success BOOLEAN
+
+ActorType INT
+
+ActorId VARCHAR(100) NULL
+
+ProjectId UUID NULL
+
+EntityId VARCHAR(100) NULL
+
+IPAddress VARCHAR(100) NULL
+
+UserAgent VARCHAR(500) NULL
+
+Details VARCHAR(2000) NULL
+
+Indexes:
+
+IX_AuditLogs_Timestamp
+
+IX_AuditLogs_ProjectId
+
+IX_AuditLogs_ActorType
+
 ---
 
 # 13. Commands
@@ -708,17 +792,96 @@ DownloadExpirationMinutes
 
 # 19. Logging
 
-Log:
+Hệ thống sử dụng **Serilog** với 3 cơ chế logging:
 
-Init upload
+## 19.1. Structured Logging (Console + File)
 
-Upload completed
+Mọi log entry dùng Serilog structured logging, output ra cả console và rolling file.
 
-Download request
+**Cấu hình** (`appsettings.json` → `Serilog` section):
 
-Delete request
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft.AspNetCore": "Warning",
+        "Microsoft.EntityFrameworkCore": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" },
+      {
+        "Name": "File",
+        "Args": {
+          "path": "logs/document-storage-.log",
+          "rollingInterval": "Day",
+          "retainedFileCountLimit": 30
+        }
+      }
+    ]
+  }
+}
+```
 
-Provider exception
+**File sink:**
+- Đường dẫn: `logs/document-storage-YYYYMMDD.log`
+- Rotation: theo ngày
+- Giữ lại: 30 ngày gần nhất
+- Format: `{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [LEVEL] {SourceContext} {Message}`
+
+**Log points có sẵn:**
+
+| File | Level | Mô tả |
+|---|---|---|
+| `ExceptionHandlingMiddleware` | Error/Warning | Unhandled exception (≥500 → Error, <500 → Warning) |
+| `AdminUserSeeder` | Information | Bootstrap admin user khi khởi động |
+| `LocalStorageProvider` | Error | Delete/Exists/GetMetadata failure |
+| `S3CompatibleStorageProvider` | Error | InitUpload/Download/Delete/Exists/GetMetadata failure |
+| `AuditLogger` | Error | Audit log persistence failure |
+
+## 19.2. Request Logging
+
+`UseSerilogRequestLogging()` middleware tự động log mỗi HTTP request:
+
+```
+[INF] HTTP POST /api/files/complete responded 201 in 45.234 ms
+```
+
+Đặt đầu pipeline, trước `ExceptionHandlingMiddleware`.
+
+## 19.3. Audit Log (Database)
+
+Ghi lại mọi mutating operation (POST/PUT/PATCH/DELETE) vào bảng `AuditLogs`.
+
+**Cơ chế:**
+- `AuditLogActionFilter` (global action filter) tự động kích hoạt cho mọi mutating request
+- Đọc actor info từ `HttpContext.Items` (set bởi auth middleware)
+- Lưu vào DB qua DI scope riêng → độc lập với request transaction
+
+**Dữ liệu ghi lại:**
+
+| Field | Ví dụ | Mô tả |
+|---|---|---|
+| HttpMethod | `POST` | HTTP method |
+| Path | `/api/files/complete` | Request path |
+| Action | `Files.CompleteUpload` | Controller.Action |
+| StatusCode | `201` | HTTP response status |
+| Success | `true` | Auto-derived: StatusCode < 400 |
+| ActorType | `Admin` / `Project` / `Anonymous` | Loại caller |
+| ActorId | `a1b2c3d4-...` | AdminUserId hoặc ProjectId |
+| ProjectId | `a1b2c3d4-...` | Project context (nếu có) |
+| EntityId | `f1e2d3c4-...` | Route id parameter |
+| IPAddress | `192.168.1.100` | Remote IP |
+| UserAgent | `Mozilla/5.0...` | User-Agent header |
+
+**Design decisions:**
+- GET/HEAD/OPTIONS không được audit (chỉ mutating methods)
+- AuditLogger dùng `IServiceScopeFactory` tạo scope riêng → audit entry persist ngay cả khi request chính fail
+- `IAuditLogger` registered as Singleton (lifetime-independent)
+- `AuditLogEntry` record (Application DTO) truyền dữ liệu từ filter → logger
+- `IAuditLogRepository` chỉ dùng cho query (`SearchAsync`) — write path đi thẳng qua DbContext
 
 ---
 
