@@ -10,6 +10,8 @@ obj/
 [Dd]ebug/
 [Rr]elease/
 artifacts/
+publish/
+PublishProfiles/
 
 # Logs
 *.log
