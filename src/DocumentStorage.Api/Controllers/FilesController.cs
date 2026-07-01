@@ -38,27 +38,8 @@ public class FilesController : ControllerBase
         return Guid.Empty;
     }
 
-    private Guid? GetScopedProjectId()
+    private Guid RequireProjectId()
     {
-        if (_currentUser.IsAdmin)
-            return null;
-
-        if (!_currentProject.IsAvailable)
-            throw new UnauthorizedAccessException("Valid X-API-Key header is required.");
-
-        return _currentProject.ProjectId;
-    }
-
-    private Guid ResolveProjectId(Guid? projectIdParam)
-    {
-        if (_currentUser.IsAdmin)
-        {
-            if (projectIdParam is { } id && id != Guid.Empty)
-                return id;
-
-            throw new UnauthorizedAccessException("Admin must specify a project via the 'projectId' query parameter.");
-        }
-
         if (!_currentProject.IsAvailable)
             throw new UnauthorizedAccessException("Valid X-API-Key header is required.");
 
@@ -78,9 +59,7 @@ public class FilesController : ControllerBase
         [FromServices] ICommandHandler<InitUploadCommand, InitUploadResponse> handler,
         CancellationToken ct)
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin cannot upload files without a project API key.");
-
+        var projectId = RequireProjectId();
         var command = new InitUploadCommand(
             projectId, request.Name, request.ContentType, request.Size, GetUserId());
 
@@ -97,9 +76,7 @@ public class FilesController : ControllerBase
         [FromServices] ICommandHandler<CompleteUploadCommand, FileDto> handler,
         CancellationToken ct)
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin cannot upload files without a project API key.");
-
+        var projectId = RequireProjectId();
         var command = new CompleteUploadCommand(
             projectId, request.FileId, request.Name, request.ContentType, request.Size,
             GetUserId(), request.Description);
@@ -115,13 +92,10 @@ public class FilesController : ControllerBase
     public async Task<IActionResult> GetById(
         Guid id,
         [FromServices] IQueryHandler<GetFileByIdQuery, FileDto> handler,
-        CancellationToken ct,
-        [FromQuery] Guid? projectId = null)
+        CancellationToken ct)
     {
-        var pid = ResolveProjectId(projectId);
-        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
-
-        var query = new GetFileByIdQuery(pid, id, userId);
+        var projectId = RequireProjectId();
+        var query = new GetFileByIdQuery(projectId, id, GetUserId());
         var result = await handler.HandleAsync(query, ct);
         return this.ToActionResult(result);
     }
@@ -133,13 +107,10 @@ public class FilesController : ControllerBase
     public async Task<IActionResult> Delete(
         Guid id,
         [FromServices] ICommandHandler<DeleteFileCommand> handler,
-        CancellationToken ct,
-        [FromQuery] Guid? projectId = null)
+        CancellationToken ct)
     {
-        var pid = ResolveProjectId(projectId);
-        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
-
-        var command = new DeleteFileCommand(pid, id, userId);
+        var projectId = RequireProjectId();
+        var command = new DeleteFileCommand(projectId, id, GetUserId());
         var result = await handler.HandleAsync(command, ct);
         return this.ToActionResult(result, successStatus: 204);
     }
@@ -157,9 +128,7 @@ public class FilesController : ControllerBase
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc")
     {
-        var projectId = GetScopedProjectId()
-            ?? throw new UnauthorizedAccessException("Admin must specify a project via the 'projectId' query parameter.");
-
+        var projectId = RequireProjectId();
         var query = new GetTrashQuery(
             projectId, null, keyword, page, pageSize, sortBy, sortDirection);
 
@@ -174,13 +143,10 @@ public class FilesController : ControllerBase
     public async Task<IActionResult> Restore(
         Guid id,
         [FromServices] ICommandHandler<RestoreFileCommand> handler,
-        CancellationToken ct,
-        [FromQuery] Guid? projectId = null)
+        CancellationToken ct)
     {
-        var pid = ResolveProjectId(projectId);
-        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
-
-        var command = new RestoreFileCommand(pid, id, userId);
+        var projectId = RequireProjectId();
+        var command = new RestoreFileCommand(projectId, id, GetUserId());
         var result = await handler.HandleAsync(command, ct);
         return this.ToActionResult(result);
     }
@@ -192,13 +158,10 @@ public class FilesController : ControllerBase
     public async Task<IActionResult> Purge(
         Guid id,
         [FromServices] ICommandHandler<PurgeFileCommand> handler,
-        CancellationToken ct,
-        [FromQuery] Guid? projectId = null)
+        CancellationToken ct)
     {
-        var pid = ResolveProjectId(projectId);
-        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
-
-        var command = new PurgeFileCommand(pid, id, userId);
+        var projectId = RequireProjectId();
+        var command = new PurgeFileCommand(projectId, id, GetUserId());
         var result = await handler.HandleAsync(command, ct);
         return this.ToActionResult(result, successStatus: 204);
     }
@@ -216,8 +179,9 @@ public class FilesController : ControllerBase
         [FromQuery] string? sortBy = null,
         [FromQuery] string? sortDirection = "asc")
     {
+        var projectId = RequireProjectId();
         var query = new SearchFilesQuery(
-            GetScopedProjectId(), keyword, null, page, pageSize, sortBy, sortDirection);
+            projectId, keyword, null, page, pageSize, sortBy, sortDirection);
 
         var result = await handler.HandleAsync(query, ct);
         return this.ToActionResult(result);
@@ -234,7 +198,8 @@ public class FilesController : ControllerBase
         [FromQuery, Range(1, int.MaxValue)] int page = 1,
         [FromQuery, Range(1, 100)] int pageSize = 20)
     {
-        var query = new GetFilesByUserQuery(GetScopedProjectId(), userId, page, pageSize);
+        var projectId = RequireProjectId();
+        var query = new GetFilesByUserQuery(projectId, userId, page, pageSize);
         var result = await handler.HandleAsync(query, ct);
         return this.ToActionResult(result);
     }
@@ -247,13 +212,10 @@ public class FilesController : ControllerBase
         Guid id,
         [FromBody] UpdateDescriptionRequest request,
         [FromServices] ICommandHandler<UpdateDescriptionCommand, FileDto> handler,
-        CancellationToken ct,
-        [FromQuery] Guid? projectId = null)
+        CancellationToken ct)
     {
-        var pid = ResolveProjectId(projectId);
-        Guid? userId = _currentUser.IsAdmin ? null : GetUserId();
-
-        var command = new UpdateDescriptionCommand(pid, id, userId, request.Description);
+        var projectId = RequireProjectId();
+        var command = new UpdateDescriptionCommand(projectId, id, GetUserId(), request.Description);
         var result = await handler.HandleAsync(command, ct);
         return this.ToActionResult(result);
     }
@@ -269,7 +231,7 @@ public class FilesController : ControllerBase
         [FromServices] IStorageProvider storageProvider,
         CancellationToken ct)
     {
-        if (!_currentUser.IsAdmin && !_currentProject.IsAvailable)
+        if (!_currentProject.IsAvailable)
             return Unauthorized(ApiResponse.Fail("Valid X-API-Key header is required."));
 
         if (storageProvider is not LocalStorageProvider local)
@@ -285,7 +247,7 @@ public class FilesController : ControllerBase
         [FromServices] IStorageProvider storageProvider,
         CancellationToken ct)
     {
-        if (!_currentUser.IsAdmin && !_currentProject.IsAvailable)
+        if (!_currentProject.IsAvailable)
             return Unauthorized(ApiResponse.Fail("Valid X-API-Key header is required."));
 
         if (storageProvider is not LocalStorageProvider local)
